@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Web DEKO - Professional CG System V11.7</title>
+    <style>
+        :root {
+            --bg-main: #121216;
+            --bg-panel: #1b1b24;
+            --bg-input: #08080b;
+            --accent: #00e5ff;
+            --text: #efefef;
+        }
+        body {
+            font-family: 'Segoe UI', Meiryo, sans-serif;
+            background-color: var(--bg-main); color: var(--text);
+            margin: 0; padding: 15px; display: flex; height: 100vh;
+            box-sizing: border-box; gap: 15px; overflow: hidden;
+        }
+        .preview-container {
+            flex: 1; display: flex; flex-direction: column; background-color: #030305; border-radius: 8px;
+            border: 1px solid #3a3a48; justify-content: center; align-items: center; position: relative;
+        }
+        .bg-selector { position: absolute; top: 15px; left: 15px; display: flex; gap: 5px; z-index: 10; align-items: center; font-size: 0.75rem; }
+        .bg-btn { border: 1px solid #555; padding: 4px 10px; font-size: 0.75rem; border-radius: 4px; cursor: pointer; color: #fff; background: #222; }
+        
+        .use-palt { font-feature-settings: "palt" 1; font-variant-ligatures: no-common-ligatures; }
+        canvas { box-shadow: 0 10px 30px rgba(0,0,0,0.7); max-width: 100%; max-height: 82vh; }
+
+        /* 完全直感型インプレイスエディタ（パネル感を撤廃、背景透過で文字を直接上書き） */
+        #inplaceEditor {
+            position: absolute; display: none; background: transparent;
+            color: #fff; border: none; outline: none; margin: 0; padding: 0;
+            z-index: 2000; overflow: hidden; font-weight: bold; resize: none;
+            line-height: 1.0; white-space: pre; word-wrap: normal;
+            caret-color: var(--accent); /* カーソルを見やすく */
+            text-shadow: 0 0 4px rgba(0,0,0,0.8);
+        }
+
+        .control-panel { width: 560px; background-color: var(--bg-panel); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; border: 1px solid #3a3a48; }
+        
+        .tab-container { display: flex; border-bottom: 2px solid #3a3a48; gap: 4px; margin-top: 5px; }
+        .tab-btn { flex: 1; background: #252530; color: #aaa; border: none; padding: 10px; cursor: pointer; font-size: 0.85rem; font-weight: bold; border-radius: 4px 4px 0 0; }
+        .tab-btn.active { background: var(--bg-panel); color: var(--accent); border: 1px solid #3a3a48; border-bottom: 2px solid var(--bg-panel); margin-bottom: -2px; }
+
+        h2 { margin: 0; font-size: 1.1rem; color: var(--accent); }
+        .section { background-color: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; border-left: 4px solid var(--accent); margin-bottom: 3px; }
+        .section h3 { margin: 0 0 8px 0; font-size: 0.85rem; color: #fff; }
+        .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 0.8rem; gap: 8px; }
+        
+        .input-sync { display: flex; align-items: center; gap: 5px; width: 70%; }
+        .input-sync input[type="range"] { flex: 1; }
+        
+        .input-sync input[type="number"], .section input[type="number"] { 
+            width: 65px; height: 24px; background: var(--bg-input); color: #fff; 
+            border: 1px solid #555; padding: 2px 4px; text-align: right; 
+            font-size: 0.85rem; border-radius: 4px; font-weight: bold;
+        }
+        input[type="text"], select, textarea { background-color: var(--bg-input); border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px; font-size: 0.85rem; }
+        textarea { resize: vertical; height: 45px; width: 70%; }
+        
+        .grad-bar-wrapper { margin: 12px 0 5px 0; position: relative; height: 20px; background: #333; border-radius: 4px; border: 1px solid #555; cursor: pointer; }
+        .grad-bar-preview { width: 100%; height: 100%; border-radius: 3px; }
+        .grad-marker { position: absolute; top: -5px; width: 10px; height: 28px; background: #fff; border: 2px solid #000; border-radius: 3px; cursor: ew-resize; transform: translateX(-5px); }
+
+        .layer-item { background: #2d2d3d; padding: 10px; margin-top: 6px; border-radius: 4px; display: flex; flex-direction: column; gap: 6px; font-size: 0.75rem; border: 1px solid #444; cursor: grab; user-select: none; }
+        .layer-item.dragging { opacity: 0.4; border: 1px dashed var(--accent); }
+        .layer-header { display: flex; align-items: center; gap: 8px; width: 100%; font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 4px; }
+        
+        .btn { background-color: #444; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+        .btn:hover { background-color: var(--accent); color: #000; }
+        .btn-active { background-color: var(--accent) !important; color: #000 !important; font-weight: bold; }
+        .btn-danger:hover { background-color: #ff3333; color: #fff; }
+
+        .obj-selector-row { display: flex; gap: 5px; background: #121216; padding: 6px; border-radius: 4px; overflow-x: auto; margin-bottom: 5px; }
+        .obj-btn { background: #252533; border: 1px solid #444; color: #fff; padding: 4px 8px; font-size: 0.75rem; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+        .obj-btn.active { border-color: var(--accent); background: #34344d; color: var(--accent); }
+    </style>
+</head>
+<body class="use-palt">
+
+    <div class="preview-container" id="canvasWrapper">
+        <div class="bg-selector">
+            <button class="bg-btn" onclick="setCanvasBg('check-d')">黒チェッカー</button>
+            <button class="bg-btn" style="color:#000; background:#fff;" onclick="setCanvasBg('check-l')">白チェッカー</button>
+            カスタム背景: <input type="color" id="customBgPicker" value="#030305" oninput="setCanvasBg('custom')">
+        </div>
+        <canvas id="dekoCanvas" width="1920" height="1080"></canvas>
+        <textarea id="inplaceEditor" spellcheck="false"></textarea>
+    </div>
+
+    <div class="control-panel">
+        <div class="section" style="border-left-color: #00ffaa;">
+            <h3>🔤 フォント ＆ アセットマネージャー</h3>
+            <div class="row">
+                アクティブフォント:
+                <select id="fontSelect" onchange="updateActiveObj('font', this.value)" style="width:160px;">
+                    <option value="sans-serif">System Sans</option>
+                    <option value="serif">System Serif</option>
+                </select>
+                追加: <input type="file" id="fontFile" accept=".ttf,.otf" style="width:150px; font-size:0.7rem;">
+            </div>
+        </div>
+
+        <div class="section" style="border-left-color: #ff0055;">
+            <h3>🛠️ トラックマネージャー</h3>
+            <div class="row">
+                <button class="btn" onclick="addNewText()" style="background:#00aa55;">+ 新規テキスト</button>
+                <input type="file" id="imageLoader" accept="image/*" style="display:none;">
+                <button class="btn" onclick="document.getElementById('imageLoader').click()" style="background:#aa00aa;">+ 画像アセット追加</button>
+            </div>
+            <div class="obj-selector-row" id="objSelectorRow"></div>
+        </div>
+
+        <div class="tab-container">
+            <button class="tab-btn active" id="tabDesignBtn" onclick="switchTab('design')">🎨 デザイン・配置</button>
+            <button class="tab-btn" id="tabLayerBtn" onclick="switchTab('layer')">🎚️ 総則スタイルレイヤー</button>
+        </div>
+
+        <div id="panelDesign">
+            <div class="section">
+                <h3>1. 配置レイアウト</h3>
+                <div class="row">
+                    文字揃え:
+                    <div style="display:flex; gap:2px;">
+                        <button class="btn" id="alignLeftBtn" onclick="setObjAlign('left')">左揃え</button>
+                        <button class="btn btn-active" id="alignCenterBtn" onclick="setObjAlign('center')">中央揃え</button>
+                        <button class="btn" id="alignRightBtn" onclick="setObjAlign('right')">右揃え</button>
+                    </div>
+                    画面配置:
+                    <div style="display:flex; gap:2px;">
+                        <button class="btn" onclick="triggerCenterLayout('H')">水平中央</button>
+                        <button class="btn" onclick="triggerCenterLayout('V')">垂直中央</button>
+                    </div>
+                </div>
+                <div class="row">
+                    改行スタック:
+                    <select id="stackMode" style="width: 50%;" onchange="changeStackModeSafe()">
+                        <option value="center">中央を中心に広がる</option>
+                        <option value="up">上に積み重なる (下基準)</option>
+                        <option value="down">下に積み重なる (上基準)</option>
+                    </select>
+                </div>
+                <div class="row">
+                    <label><input type="checkbox" id="enableSnap" checked> 画面軸・セーフティにマグネット吸着</label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>2. 精密トランスフォーム＆部分特殊デザイン</h3>
+                <div id="textEditorArea">
+                    <div class="row">
+                        テキスト内容:<br><textarea id="textStr" oninput="updateActiveObj('text', this.value)"></textarea>
+                        行間隔: <input type="number" id="lineSpacing" value="25" style="width:50px;" oninput="updateActiveObj('lineSpacing', this.value)">
+                    </div>
+                    <div style="background: rgba(0,229,255,0.08); padding: 8px; border-radius: 4px; margin-top: 5px; border: 1px dashed var(--accent);">
+                        <div class="row" style="font-weight: bold; color: var(--accent);">✨ 部分装飾ターゲット指定 (文字ドラッグで自動選択)</div>
+                        <div class="row">
+                            適用文字インデックス:
+                            <div>
+                                開始: <input type="number" id="rangeStart" value="-1" min="-1" style="width:45px;" oninput="drawSystem()">
+                                終了: <input type="number" id="rangeEnd" value="-1" min="-1" style="width:45px;" oninput="drawSystem()">
+                            </div>
+                        </div>
+                        <div class="row">
+                            部分色モード:
+                            <select id="partColorMode" style="font-size:0.75rem;" onchange="drawSystem()">
+                                <option value="none">指定しない (全共通)</option>
+                                <option value="solid">部分単色カラー</option>
+                                <option value="gold">超高級ゴールド加工</option>
+                            </select>
+                            カラー: <input type="color" id="partSolidColor" value="#ffea00" oninput="drawSystem()">
+                        </div>
+                    </div>
+                </div>
+                <div class="row" style="margin-top:8px;">
+                    位置 X / Y:
+                    <div>
+                        X: <input type="number" id="objX" value="960" oninput="updateActiveObj('x', this.value)">
+                        Y: <input type="number" id="objY" value="756" oninput="updateActiveObj('y', this.value)">
+                    </div>
+                    回転 (度):
+                    <input type="number" id="objRotate" value="0" style="width:55px;" oninput="updateActiveObj('rotate', this.value)">
+                </div>
+                <div class="row">
+                    サイズ:
+                    <div class="input-sync">
+                        <input type="range" id="fontSize" min="10" max="300" value="130" oninput="syncParam('fontSize', this.value); updateActiveObj('size', this.value)">
+                        <input type="number" id="fontSize_num" value="130" oninput="syncParam('fontSize_num', this.value); updateActiveObj('size', this.value)">
+                    </div>
+                </div>
+                <div class="row">
+                    長体/平体 (%):
+                    <div class="input-sync">
+                        <input type="range" id="textScaleX" min="30" max="200" value="100" oninput="syncParam('textScaleX', this.value); updateActiveObj('scaleX', this.value)">
+                        <input type="number" id="textScaleX_num" value="100" oninput="syncParam('textScaleX_num', this.value); updateActiveObj('scaleX', this.value)">
+                    </div>
+                </div>
+                <div class="row">
+                    斜体 (度):
+                    <div class="input-sync">
+                        <input type="range" id="textSkewX" min="-60" max="60" value="0" oninput="syncParam('textSkewX', this.value); updateActiveObj('skewX', this.value)">
+                        <input type="number" id="textSkewX_num" value="0" oninput="syncParam('textSkewX_num', this.value); updateActiveObj('skewX', this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>3. 高級フェイスエフェクト</h3>
+                <div class="row">
+                    塗りモード:
+                    <select id="faceColorMode" onchange="updateActiveObj('faceColorMode', this.value); toggleFaceUI();">
+                        <option value="gradient">タイムライン・グラデーション</option>
+                        <option value="solid">単色カラー</option>
+                    </select>
+                    マッピング:
+                    <select id="gradMapping" onchange="updateActiveObj('gradMapping', this.value)">
+                        <option value="character">文字単位フィット</option>
+                        <option value="total">全体一律</option>
+                    </select>
+                </div>
+
+                <div id="solidColorSection" style="display:none; margin: 10px 0;">
+                    <div class="row">
+                        フェースカラー指定:
+                        <input type="color" id="faceSolidColorPicker" value="#ffffff" oninput="updateActiveObj('faceSolidColor', this.value)">
+                    </div>
+                </div>
+
+                <div id="gradBarSection">
+                    <div class="row">角度 (度): <input type="number" id="gradAngle" value="90" style="width:60px;" oninput="updateActiveObj('gradAngle', this.value)"></div>
+                    <div class="grad-bar-wrapper" id="gradBarWrapper">
+                        <div class="grad-bar-preview" id="gradBarPreview"></div>
+                    </div>
+                    <div class="row" style="margin-top:5px;">
+                        選択点の色: <input type="color" id="markerColorPicker">
+                        <button class="btn btn-danger" onclick="deleteActiveMarker()" style="padding:2px 6px;">選択点を削除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="panelLayer" style="display:none;">
+            <div class="section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h3 style="margin:0;">🎚️ スタイルスタック効果</h3>
+                    <div style="display:flex; gap:4px;">
+                        <button class="btn" onclick="addFXLayerToActive('edge')" style="background: #00ffaa; color:#000; font-weight:bold;">+ 縁取り追加</button>
+                        <button class="btn" onclick="addFXLayerToActive('shadow')" style="background: #ffcc00; color:#000; font-weight:bold;">+ シャドウ追加</button>
+                    </div>
+                </div>
+                <div id="layerContainer"></div>
+            </div>
+        </div>
+
+        <div class="row" style="margin-top:auto; border-top: 1px solid #3a3a48; padding-top:10px;">
+            <label><input type="checkbox" id="showSafety" checked onchange="drawSystem()"> セーフティ表示</label>
+            <button class="btn btn-danger" onclick="deleteActiveObject()" style="padding:5px 10px;">アクティブ削除</button>
+            <button class="btn" id="exportBtn" style="background:var(--accent); color:#000; font-weight:bold; padding:8px 15px;">PNG書き出し</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('dekoCanvas');
+        const ctx = canvas.getContext('2d');
+        const inplaceEditor = document.getElementById('inplaceEditor');
+
+        let bgMode = 'check-d';
+        let customBgColor = '#030305';
+
+        let objects = [
+            {
+                id: 'track_1', type: 'text', text: "ダブルクリックで\n画面上で直接変えられるヨ！",
+                x: 1920/2, y: 1080*0.65, size: 110, scaleX: 100, skewX: 0, rotate: 0, lineSpacing: 25,
+                align: 'center', stackMode: 'center', font: 'sans-serif',
+                faceColorMode: 'gradient', faceSolidColor: '#ffffff', gradMapping: 'character', gradAngle: 90,
+                gradMarkers: [{pos:0, color:'#ffffff'}, {pos:100, color:'#00e5ff'}],
+                fxLayers: [
+                    { type: 'edge', mode: 'gradient', color: '#000000', gradAngle: 90, gradMarkers: [{pos:0, color:'#ff0055'}, {pos:100, color:'#220011'}], size: 22 },
+                    { type: 'shadow', mode: 'solid', color: '#000000', thickness: 10, blur: 12, ox: 12, oy: -12 }
+                ],
+                hitBox: { x0: 0, y0: 0, x1: 0, y1: 0 }
+            }
+        ];
+        let activeObjId = 'track_1';
+        let selectedMarkerIdx = 0;
+
+        let isDragging = false;
+        let dragTargetObj = null;
+        let dragStartX = 0, dragStartY = 0;
+        let lastClickTime = 0;
+        let dragSrcEl = null;
+
+        let layerSelectedMarkerIdx = {};
+
+        function syncParam(id, val) {
+            let targetId = id.endsWith('_num') ? id.replace('_num', '') : id + '_num';
+            let targetEl = document.getElementById(targetId);
+            if(targetEl) targetEl.value = val;
+        }
+
+        function setCanvasBg(mode) {
+            bgMode = mode;
+            if(mode === 'custom') customBgColor = document.getElementById('customBgPicker').value;
+            drawSystem();
+        }
+
+        function switchTab(tab) {
+            document.getElementById('tabDesignBtn').classList.toggle('active', tab === 'design');
+            document.getElementById('tabLayerBtn').classList.toggle('active', tab === 'layer');
+            document.getElementById('panelDesign').style.display = tab === 'design' ? 'block' : 'none';
+            document.getElementById('panelLayer').style.display = tab === 'layer' ? 'block' : 'none';
+            if (tab === 'layer') renderLayerPanel();
+        }
+
+        function getActiveObj() {
+            return objects.find(o => o.id === activeObjId) || null;
+        }
+
+        function changeStackModeSafe() {
+            const obj = getActiveObj(); if(!obj) return;
+            const oldMode = obj.stackMode;
+            const newMode = document.getElementById('stackMode').value;
+            if(obj.type !== 'text') { obj.stackMode = newMode; drawSystem(); return; }
+
+            const lines = obj.text.split('\n');
+            const totalH = (lines.length * obj.size) + ((lines.length - 1) * obj.lineSpacing);
+
+            let diffY = 0;
+            if (oldMode === 'center' && newMode === 'up') diffY = totalH / 2;
+            if (oldMode === 'center' && newMode === 'down') diffY = -totalH / 2;
+            if (oldMode === 'up' && newMode === 'center') diffY = -totalH / 2;
+            if (oldMode === 'up' && newMode === 'down') diffY = -totalH;
+            if (oldMode === 'down' && newMode === 'center') diffY = totalH / 2;
+            if (oldMode === 'down' && newMode === 'up') diffY = totalH;
+
+            obj.y += diffY; obj.stackMode = newMode;
+            drawSystem();
+        }
+
+        function setObjAlign(align) {
+            const obj = getActiveObj(); if(!obj) return;
+            obj.align = align;
+            ['alignLeftBtn', 'alignCenterBtn', 'alignRightBtn'].forEach(id => document.getElementById(id).classList.remove('btn-active'));
+            document.getElementById(`align${align.charAt(0).toUpperCase() + align.slice(1)}Btn`).classList.add('btn-active');
+            drawSystem();
+        }
+
+        function triggerCenterLayout(dir) {
+            const obj = getActiveObj(); if(!obj) return;
+            if (dir === 'V') { obj.y = 1080 / 2; drawSystem(); return; }
+            if (dir === 'H') {
+                if (obj.type !== 'text' || obj.align === 'center') { obj.x = 1920 / 2; }
+                else {
+                    const lines = obj.text.split('\n');
+                    ctx.save(); ctx.font = `bold ${obj.size}px ${obj.font}`;
+                    let maxWidth = 0;
+                    lines.forEach(l => {
+                        const w = ctx.measureText(l).width * (obj.scaleX / 100);
+                        if(w > maxWidth) maxWidth = w;
+                    });
+                    ctx.restore();
+                    if (obj.align === 'left') obj.x = (1920 / 2) - (maxWidth / 2);
+                    else if (obj.align === 'right') obj.x = (1920 / 2) + (maxWidth / 2);
+                }
+            }
+            drawSystem();
+        }
+
+        function updateActiveObj(prop, val) {
+            const obj = getActiveObj(); if (!obj) return;
+            if (['size', 'scaleX', 'skewX', 'lineSpacing', 'x', 'y', 'rotate'].includes(prop)) val = parseInt(val) || 0;
+            obj[prop] = val;
+            if (prop === 'x') document.getElementById('objX').value = val;
+            if (prop === 'y') document.getElementById('objY').value = val;
+            if (prop === 'text') document.getElementById('textStr').value = val;
+            if (prop === 'rotate') document.getElementById('objRotate').value = val;
+            drawSystem();
+        }
+
+        function toggleFaceUI() {
+            const obj = getActiveObj(); if(!obj) return;
+            const isGrad = obj.faceColorMode === 'gradient';
+            document.getElementById('gradBarSection').style.display = isGrad ? 'block' : 'none';
+            document.getElementById('solidColorSection').style.display = isGrad ? 'none' : 'block';
+            document.getElementById('gradMapping').disabled = !isGrad;
+        }
+
+        function updateTrackSelector() {
+            const container = document.getElementById('objSelectorRow'); container.innerHTML = '';
+            objects.forEach(obj => {
+                const btn = document.createElement('button');
+                btn.className = `obj-btn ${obj.id === activeObjId ? 'active' : ''}`;
+                btn.innerText = obj.type === 'text' ? `📝 ${obj.text.split('\n')[0] || '空テキスト'}` : `🖼️ 画像アセット`;
+                btn.onclick = () => { activeObjId = obj.id; selectObjectBind(); };
+                container.appendChild(btn);
+            });
+        }
+
+        function selectObjectBind() {
+            const obj = getActiveObj();
+            updateTrackSelector();
+            
+            if(!obj) {
+                document.getElementById('textEditorArea').style.display = 'none';
+                renderLayerPanel(); drawSystem(); return;
+            }
+            
+            document.getElementById('textEditorArea').style.display = obj.type === 'text' ? 'block' : 'none';
+            if (obj.type === 'text') {
+                document.getElementById('textStr').value = obj.text;
+                document.getElementById('lineSpacing').value = obj.lineSpacing;
+            }
+            
+            document.getElementById('fontSize').value = obj.size;
+            document.getElementById('fontSize_num').value = obj.size;
+            document.getElementById('textScaleX').value = obj.scaleX;
+            document.getElementById('textScaleX_num').value = obj.scaleX;
+            document.getElementById('textSkewX').value = obj.skewX;
+            document.getElementById('textSkewX_num').value = obj.skewX;
+            document.getElementById('faceColorMode').value = obj.faceColorMode;
+            document.getElementById('faceSolidColorPicker').value = obj.faceSolidColor || '#ffffff';
+            document.getElementById('gradMapping').value = obj.gradMapping;
+
+            document.getElementById('objX').value = obj.x;
+            document.getElementById('objY').value = obj.y;
+            document.getElementById('objRotate').value = obj.rotate;
+
+            ['alignLeftBtn', 'alignCenterBtn', 'alignRightBtn'].forEach(id => document.getElementById(id).classList.remove('btn-active'));
+            if(obj.align) document.getElementById(`align${obj.align.charAt(0).toUpperCase() + obj.align.slice(1)}Btn`).classList.add('btn-active');
+
+            toggleFaceUI(); renderGradTimeline(); renderLayerPanel(); drawSystem();
+        }
+
+        function addNewText() {
+            const id = 'track_' + Date.now();
+            objects.push({
+                id: id, type: 'text', text: "新規タイトル",
+                x: 1920/2, y: 1080/2, size: 110, scaleX: 100, skewX: 0, rotate: 0, lineSpacing: 15,
+                align: 'center', stackMode: 'center', font: 'sans-serif',
+                faceColorMode: 'solid', faceSolidColor: '#ffffff', gradMapping: 'total', gradAngle: 90,
+                gradMarkers: [{pos:0, color:'#00ffff'}, {pos:100, color:'#0055ff'}],
+                fxLayers: [{ type: 'edge', mode: 'solid', color: '#000000', size: 15 }]
+            });
+            activeObjId = id; selectObjectBind();
+        }
+
+        function deleteActiveObject() {
+            if(!activeObjId || objects.length === 0) return;
+            objects = objects.filter(o => o.id !== activeObjId);
+            activeObjId = objects.length > 0 ? objects[0].id : null; selectObjectBind();
+        }
+
+        document.getElementById('fontFile').onchange = async (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            const fontId = "FontPool_" + Date.now();
+            const fontFace = new FontFace(fontId, await file.arrayBuffer());
+            await fontFace.load(); document.fonts.add(fontFace);
+            const opt = document.createElement('option'); opt.value = fontId; opt.innerText = file.name;
+            const sel = document.getElementById('fontSelect'); sel.appendChild(opt); sel.value = fontId;
+            updateActiveObj('font', fontId);
+        };
+
+        function renderGradTimeline() {
+            const obj = getActiveObj(); if (!obj || !obj.gradMarkers) return;
+            obj.gradMarkers.sort((a,b) => a.pos - b.pos);
+            const previewEl = document.getElementById('gradBarPreview');
+            previewEl.style.background = `linear-gradient(to right, ${obj.gradMarkers.map(m => `${m.color} ${m.pos}%`).join(', ')})`;
+
+            document.querySelectorAll('#gradBarSection .grad-marker').forEach(el => el.remove());
+            obj.gradMarkers.forEach((marker, idx) => {
+                const pin = document.createElement('div'); pin.className = 'grad-marker'; pin.style.left = `${marker.pos}%`;
+                if(idx === selectedMarkerIdx) pin.style.borderColor = '#00e5ff';
+
+                pin.addEventListener('mousedown', (e) => {
+                    e.stopPropagation(); selectedMarkerIdx = idx; markerColorPicker.value = marker.color; renderGradTimeline();
+                    function onMarkerMove(me) {
+                        const rect = gradBarWrapper.getBoundingClientRect();
+                        marker.pos = Math.max(0, Math.min(100, Math.round(((me.clientX - rect.left) / rect.width) * 100)));
+                        renderGradTimeline(); drawSystem();
+                    }
+                    function onMarkerUp() { window.removeEventListener('mousemove', onMarkerMove); window.removeEventListener('mouseup', onMarkerUp); }
+                    window.addEventListener('mousemove', onMarkerMove); window.addEventListener('mouseup', onMarkerUp);
+                });
+                gradBarWrapper.appendChild(pin);
+            });
+        }
+
+        gradBarWrapper.onclick = (e) => {
+            if(e.target !== gradBarWrapper && e.target !== document.getElementById('gradBarPreview')) return;
+            const obj = getActiveObj(); if(!obj) return;
+            const rect = gradBarWrapper.getBoundingClientRect();
+            let p = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+            obj.gradMarkers.push({ pos: p, color: '#ffff00' }); selectedMarkerIdx = obj.gradMarkers.length - 1;
+            renderGradTimeline(); drawSystem();
+        };
+
+        markerColorPicker.oninput = (e) => {
+            const obj = getActiveObj(); if(obj && obj.gradMarkers[selectedMarkerIdx]) { obj.gradMarkers[selectedMarkerIdx].color = e.target.value; renderGradTimeline(); drawSystem(); }
+        };
+
+        function deleteActiveMarker() {
+            const obj = getActiveObj(); if(!obj || obj.gradMarkers.length <= 1) return;
+            obj.gradMarkers.splice(selectedMarkerIdx, 1); selectedMarkerIdx = 0; renderGradTimeline(); drawSystem();
+        }
+
+        function buildLayerGradTimeline(layer, index, parentDiv) {
+            if(layer.mode !== 'gradient') return;
+            if(!layer.gradMarkers) layer.gradMarkers = [{pos:0, color:'#ffffff'}, {pos:100, color:'#000000'}];
+            if(layerSelectedMarkerIdx[index] === undefined) layerSelectedMarkerIdx[index] = 0;
+
+            layer.gradMarkers.sort((a,b) => a.pos - b.pos);
+
+            const wrapper = document.createElement('div'); wrapper.className = 'grad-bar-wrapper ignore-drag';
+            const preview = document.createElement('div'); preview.className = 'grad-bar-preview';
+            preview.style.background = `linear-gradient(to right, ${layer.gradMarkers.map(m => `${m.color} ${m.pos}%`).join(', ')})`;
+            wrapper.appendChild(preview);
+
+            layer.gradMarkers.forEach((marker, mIdx) => {
+                const pin = document.createElement('div'); pin.className = 'grad-marker'; pin.style.left = `${marker.pos}%`;
+                if(mIdx === layerSelectedMarkerIdx[index]) pin.style.borderColor = 'var(--accent)';
+                
+                pin.addEventListener('mousedown', (me) => {
+                    me.stopPropagation(); layerSelectedMarkerIdx[index] = mIdx;
+                    const cp = parentDiv.querySelector(`.layer-picker-${index}`);
+                    if(cp) cp.value = marker.color;
+                    renderLayerPanel();
+                    
+                    function onPinMove(mme) {
+                        const rect = wrapper.getBoundingClientRect();
+                        marker.pos = Math.max(0, Math.min(100, Math.round(((mme.clientX - rect.left) / rect.width) * 100)));
+                        preview.style.background = `linear-gradient(to right, ${layer.gradMarkers.map(m => `${m.color} ${m.pos}%`).join(', ')})`;
+                        drawSystem();
+                    }
+                    function onPinUp() { window.removeEventListener('mousemove', onPinMove); window.removeEventListener('mouseup', onPinUp); }
+                    window.addEventListener('mousemove', onPinMove); window.addEventListener('mouseup', onPinUp);
+                });
+                wrapper.appendChild(pin);
+            });
+
+            wrapper.addEventListener('click', (ce) => {
+                if(ce.target !== wrapper && ce.target !== preview) return;
+                const rect = wrapper.getBoundingClientRect();
+                let p = Math.round(((ce.clientX - rect.left) / rect.width) * 100);
+                layer.gradMarkers.push({pos: p, color: '#ff00ee'});
+                layerSelectedMarkerIdx[index] = layer.gradMarkers.length - 1;
+                renderLayerPanel(); drawSystem();
+            });
+
+            return wrapper;
+        }
+
+        function renderLayerPanel() {
+            const container = document.getElementById('layerContainer'); container.innerHTML = '';
+            const obj = getActiveObj(); if(!obj || !obj.fxLayers) return;
+
+            obj.fxLayers.forEach((layer, index) => {
+                const div = document.createElement('div'); div.className = 'layer-item';
+                div.draggable = true; div.dataset.index = index;
+                let isEdge = layer.type === 'edge';
+                
+                let controlsHTML = `
+                    <div class="layer-header">
+                        <span style="color:${isEdge ? '#00ffaa' : '#ffcc00'};">☰ ${isEdge ? '外枠フチ' : '放送用シャドウ'}</span>
+                        <select class="fx-mode-select" data-idx="${index}">
+                            <option value="solid" ${layer.mode === 'solid'?'selected':''}>単色</option>
+                            <option value="gradient" ${layer.mode === 'gradient'?'selected':''}>タイムライン・グラデーション</option>
+                        </select>
+                        <button class="btn btn-danger" onclick="deleteFXLayer(${index})" style="margin-left:auto; padding:2px 5px;">✕</button>
+                    </div>
+                    <div class="row style-color-row" id="colorRow_${index}">
+                        角度:<input type="number" class="fx-input ignore-drag" data-prop="gradAngle" data-idx="${index}" value="${layer.gradAngle||90}" style="width:40px;">
+                        ${layer.mode === 'gradient' ? `
+                            選択点の色:<input type="color" class="layer-picker-${index} ignore-drag" value="${layer.gradMarkers && layer.gradMarkers[layerSelectedMarkerIdx[index]] ? layer.gradMarkers[layerSelectedMarkerIdx[index]].color : '#ffffff'}">
+                            <button class="btn btn-danger" onclick="deleteLayerMarker(${index})" style="padding:1px 4px; font-size:0.65rem;">点削除</button>
+                        ` : `
+                            カラー:<input type="color" class="fx-input ignore-drag" data-prop="color" data-idx="${index}" value="${layer.color||'#000000'}">
+                        `}
+                    </div>
+                `;
+
+                if(isEdge) {
+                    controlsHTML += `
+                        <div class="row">フチ太さ:
+                            <div class="input-sync">
+                                <input type="range" class="fx-slider ignore-drag" data-prop="size" data-idx="${index}" min="1" max="100" value="${layer.size}">
+                                <input type="number" class="fx-input-num ignore-drag" data-prop="size" data-idx="${index}" value="${layer.size}">
+                            </div>
+                        </div>`;
+                } else {
+                    controlsHTML += `
+                        <div class="row">太さ:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="thickness" data-idx="${index}" min="0" max="100" value="${layer.thickness}"><input type="number" class="fx-input-num ignore-drag" data-prop="thickness" data-idx="${index}" value="${layer.thickness}"></div></div>
+                        <div class="row">ぼかし:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="blur" data-idx="${index}" min="0" max="100" value="${layer.blur}"><input type="number" class="fx-input-num ignore-drag" data-prop="blur" data-idx="${index}" value="${layer.blur}"></div></div>
+                        <div class="row">位置 X:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="ox" data-idx="${index}" min="-100" max="100" value="${layer.ox}"><input type="number" class="fx-input-num ignore-drag" data-prop="ox" data-idx="${index}" value="${layer.ox}"></div></div>
+                        <div class="row">位置 Y:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="oy" data-idx="${index}" min="-100" max="100" value="${layer.oy}"><input type="number" class="fx-input-num ignore-drag" data-prop="oy" data-idx="${index}" value="${layer.oy}"></div></div>
+                    `;
+                }
+
+                div.innerHTML = controlsHTML;
+
+                if(layer.mode === 'gradient') {
+                    const bar = buildLayerGradTimeline(layer, index, div);
+                    if(bar) div.insertBefore(bar, div.children[2]);
+                }
+
+                div.querySelectorAll('.ignore-drag, select, button, input').forEach(el => {
+                    el.addEventListener('mouseenter', () => { div.draggable = false; });
+                    el.addEventListener('mouseleave', () => { div.draggable = true; });
+                });
+
+                div.addEventListener('dragstart', handleDragStart, false);
+                div.addEventListener('dragover', handleDragOver, false);
+                div.addEventListener('drop', handleDrop, false);
+                div.addEventListener('dragend', handleDragEnd, false);
+
+                const picker = div.querySelector(`.layer-picker-${index}`);
+                if(picker) {
+                    picker.oninput = (e) => {
+                        let sIdx = layerSelectedMarkerIdx[index];
+                        if(layer.gradMarkers && layer.gradMarkers[sIdx]) {
+                            layer.gradMarkers[sIdx].color = e.target.value;
+                            const barPrev = div.querySelector('.grad-bar-preview');
+                            if(barPrev) barPrev.style.background = `linear-gradient(to right, ${layer.gradMarkers.map(m => `${m.color} ${m.pos}%`).join(', ')})`;
+                            drawSystem();
+                        }
+                    };
+                }
+
+                container.appendChild(div);
+            });
+
+            container.querySelectorAll('.fx-slider').forEach(slider => {
+                slider.oninput = (e) => {
+                    const idx = e.target.dataset.idx; const prop = e.target.dataset.prop;
+                    obj.fxLayers[idx][prop] = parseInt(e.target.value);
+                    e.target.nextElementSibling.value = e.target.value; drawSystem();
+                };
+            });
+            container.querySelectorAll('.fx-input-num').forEach(numInput => {
+                numInput.oninput = (e) => {
+                    const idx = e.target.dataset.idx; const prop = e.target.dataset.prop;
+                    obj.fxLayers[idx][prop] = parseInt(e.target.value) || 0;
+                    e.target.previousElementSibling.value = e.target.value; drawSystem();
+                };
+            });
+            container.querySelectorAll('.fx-input').forEach(input => {
+                input.oninput = (e) => {
+                    const idx = e.target.dataset.idx; const prop = e.target.dataset.prop;
+                    obj.fxLayers[idx][prop] = parseInt(e.target.value) || 0; drawSystem();
+                };
+            });
+            container.querySelectorAll('.fx-mode-select').forEach(sel => {
+                sel.onchange = (e) => {
+                    const idx = e.target.dataset.idx;
+                    obj.fxLayers[idx].mode = e.target.value;
+                    if(e.target.value === 'gradient' && !obj.fxLayers[idx].gradMarkers) {
+                        obj.fxLayers[idx].gradAngle = 90;
+                        obj.fxLayers[idx].gradMarkers = [{pos:0, color:'#ffffff'}, {pos:100, color:'#000000'}];
+                    }
+                    renderLayerPanel(); drawSystem();
+                };
+            });
+        }
+
+        function deleteLayerMarker(lIdx) {
+            const obj = getActiveObj(); if(!obj) return;
+            const layer = obj.fxLayers[lIdx];
+            if(!layer || !layer.gradMarkers || layer.gradMarkers.length <= 1) return;
+            layer.gradMarkers.splice(layerSelectedMarkerIdx[lIdx], 1);
+            layerSelectedMarkerIdx[lIdx] = 0; renderLayerPanel(); drawSystem();
+        }
+
+        function handleDragStart(e) { this.classList.add('dragging'); dragSrcEl = this; e.dataTransfer.effectAllowed = 'move'; }
+        function handleDragOver(e) { if (e.preventDefault) e.preventDefault(); return false; }
+        function handleDrop(e) {
+            if (e.stopPropagation) e.stopPropagation();
+            if (dragSrcEl !== this) {
+                const obj = getActiveObj(); if(!obj) return false;
+                const srcIdx = parseInt(dragSrcEl.dataset.index);
+                const targetIdx = parseInt(this.dataset.index);
+                const rem = obj.fxLayers.splice(srcIdx, 1)[0];
+                obj.fxLayers.splice(targetIdx, 0, rem);
+                renderLayerPanel(); drawSystem();
+            }
+            return false;
+        }
+        function handleDragEnd() { this.classList.remove('dragging'); }
+
+        function addFXLayerToActive(type) {
+            const obj = getActiveObj(); if(!obj) return;
+            if(!obj.fxLayers) obj.fxLayers = [];
+            if (type === 'edge') {
+                obj.fxLayers.unshift({ type: 'edge', mode: 'solid', color: '#000000', gradAngle: 90, gradMarkers: [{pos:0, color:'#fff'}, {pos:100, color:'#000'}], size: 16 });
+            } else if (type === 'shadow') {
+                obj.fxLayers.unshift({ type: 'shadow', mode: 'solid', color: '#000000', gradAngle: 90, gradMarkers: [{pos:0, color:'#fff'}, {pos:100, color:'#000'}], thickness: 10, blur: 15, ox: 12, oy: -12 });
+            }
+            renderLayerPanel(); drawSystem();
+        }
+        function deleteFXLayer(idx) { const obj = getActiveObj(); if(obj) obj.fxLayers.splice(idx, 1); renderLayerPanel(); drawSystem(); }
+
+        // --- コアレンダリングエンジン V11.7 ---
+        function drawSystem(isExport = false) {
+            if (isExport) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            } else {
+                if (bgMode === 'check-d') {
+                    ctx.fillStyle = '#030305'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#101015';
+                    for(let y=0; y<canvas.height; y+=40) for(let x=0; x<canvas.width; x+=40) if((x+y)%80===0) ctx.fillRect(x,y,40,40);
+                } else if (bgMode === 'check-l') {
+                    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#e0e0e0';
+                    for(let y=0; y<canvas.height; y+=40) for(let x=0; x<canvas.width; x+=40) if((x+y)%80===0) ctx.fillRect(x,y,40,40);
+                } else {
+                    ctx.fillStyle = customBgColor; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+
+            const rStart = parseInt(document.getElementById('rangeStart')?.value) ?? -1;
+            const rEnd = parseInt(document.getElementById('rangeEnd')?.value) ?? -1;
+            const pMode = document.getElementById('partColorMode')?.value ?? 'none';
+            const pColor = document.getElementById('partSolidColor')?.value ?? '#ffea00';
+
+            objects.forEach(obj => {
+                if (obj.type === 'image') return;
+                const lines = obj.text.split('\n');
+                if (lines.length === 0 || (lines.length === 1 && lines[0] === '' && objects.length > 1)) return;
+
+                const fSize = obj.size;
+                const scaleX = obj.scaleX / 100;
+                const skewX = (obj.skewX * Math.PI) / 180;
+                ctx.canvas.style.fontFeatureSettings = '"palt" 1';
+                ctx.font = `bold ${fSize}px ${obj.font}`;
+                ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.textBaseline = 'alphabetic';
+
+                let lineData = [];
+                let maxLineWidth = 0;
+                let absoluteCharIdx = 0;
+
+                lines.forEach((lineText) => {
+                    let lineAdvance = 0;
+                    let chars = lineText.split('').map(char => {
+                        const m = ctx.measureText(char);
+                        lineAdvance += m.width;
+                        let currentIdx = absoluteCharIdx++;
+                        let isTarget = (rStart !== -1 && rEnd !== -1 && currentIdx >= rStart && currentIdx <= rEnd);
+                        return { char, advanceWidth: m.width, isTarget };
+                    });
+                    absoluteCharIdx++; // 改行コード分進める
+                    if(lineAdvance * scaleX > maxLineWidth) maxLineWidth = lineAdvance * scaleX;
+                    lineData.push({ chars, totalWidth: lineAdvance });
+                });
+
+                const totalH = (lines.length * fSize) + ((lines.length - 1) * obj.lineSpacing);
+                let startOffsetY = obj.stackMode === 'center' ? -totalH/2 + fSize*0.8 : (obj.stackMode === 'up' ? -totalH + fSize*0.8 : fSize*0.8);
+
+                obj.hitBox = {
+                    x0: obj.align === 'center' ? obj.x - maxLineWidth/2 : (obj.align === 'right' ? obj.x - maxLineWidth : obj.x),
+                    y0: obj.y + startOffsetY - fSize*0.8,
+                    x1: (obj.align === 'center' ? obj.x - maxLineWidth/2 : (obj.align === 'right' ? obj.x - maxLineWidth : obj.x)) + maxLineWidth,
+                    y1: obj.y + startOffsetY + totalH - fSize*0.2
+                };
+
+                function getAdvancedStyle(layerOrObj, bounds) {
+                    let markers = layerOrObj.gradMarkers || layerOrObj.markers;
+                    if (!markers) return layerOrObj.color || '#000';
+                    const angleRad = ((layerOrObj.gradAngle || 90) * Math.PI) / 180;
+                    const cx = (bounds.left + bounds.right) / 2; const cy = (bounds.top + bounds.bottom) / 2;
+                    const w = bounds.right - bounds.left; const h = bounds.bottom - bounds.top;
+                    const r = Math.sqrt(w * w + h * h) / 2;
+                    const grad = ctx.createLinearGradient(cx - r * Math.cos(angleRad), cy - r * Math.sin(angleRad), cx + r * Math.cos(angleRad), cy + r * Math.sin(angleRad));
+                    markers.forEach(m => grad.addColorStop(m.pos / 100, m.color));
+                    return grad;
+                }
+
+                function executeRenderPass(mode, layer = null) {
+                    let currentLineY = obj.y + startOffsetY;
+                    lineData.forEach(ld => {
+                        let lineStartX = obj.align === 'center' ? obj.x - (ld.totalWidth * scaleX)/2 : (obj.align === 'right' ? obj.x - ld.totalWidth * scaleX : obj.x);
+                        let trackingX = lineStartX;
+
+                        ld.chars.forEach(cm => {
+                            ctx.save(); 
+                            // 回転軸のトランスフォーム
+                            ctx.translate(obj.x, obj.y); ctx.rotate((obj.rotate * Math.PI) / 180); ctx.translate(-obj.x, -obj.y);
+                            
+                            const charCenterX = trackingX + (cm.advanceWidth * scaleX) / 2;
+                            ctx.translate(charCenterX, currentLineY);
+                            
+                            // 【超重要】斜体（skewX）のみ行列変形をかけ、長体は引数のmaxWidthで処理
+                            ctx.transform(1, 0, Math.tan(skewX), 1, 0, 0);
+
+                            const targetWidth = cm.advanceWidth * scaleX;
+                            const cBounds = { left: -targetWidth/2, right: targetWidth/2, top: -fSize, bottom: fSize*0.2 };
+
+                            let overridenFill = null;
+                            if (cm.isTarget && pMode !== 'none') {
+                                if (pMode === 'solid') overridenFill = pColor;
+                                else if (pMode === 'gold') {
+                                    let goldGrad = ctx.createLinearGradient(0, -fSize, 0, fSize*0.2);
+                                    goldGrad.addColorStop(0, '#fff3a3'); goldGrad.addColorStop(0.3, '#f1c40f');
+                                    goldGrad.addColorStop(0.5, '#b7860b'); goldGrad.addColorStop(0.8, '#f39c12');
+                                    goldGrad.addColorStop(1, '#fffdf0');
+                                    overridenFill = goldGrad;
+                                }
+                            }
+
+                            if (mode === 'shadow') {
+                                ctx.save();
+                                if (layer.blur > 0) {
+                                    ctx.shadowColor = (layer.mode === 'gradient' && layer.gradMarkers) ? layer.gradMarkers[0].color : layer.color;
+                                    ctx.shadowBlur = layer.blur; ctx.shadowOffsetX = layer.ox; ctx.shadowOffsetY = -layer.oy;
+                                } else {
+                                    ctx.translate(layer.ox, -layer.oy);
+                                }
+                                let style = layer.mode === 'gradient' ? getAdvancedStyle(layer, cBounds) : layer.color;
+                                ctx.fillStyle = style;
+                                if (layer.thickness > 0) { 
+                                    ctx.strokeStyle = style; 
+                                    ctx.lineWidth = layer.thickness; // 長体に依存せず常に均等
+                                    ctx.strokeText(cm.char, -targetWidth / 2, 0, targetWidth); 
+                                }
+                                ctx.fillText(cm.char, -targetWidth / 2, 0, targetWidth);
+                                ctx.restore();
+
+                            } else if (mode === 'edge') {
+                                ctx.strokeStyle = layer.mode === 'gradient' ? getAdvancedStyle(layer, cBounds) : layer.color;
+                                ctx.lineWidth = layer.size; // 【解決】長体比率で割るコトを廃止し、歪みのない均等な絶対サイズを維持！
+                                ctx.strokeText(cm.char, -targetWidth / 2, 0, targetWidth); // 第4引数による長体化で線が真円をキープ
+
+                            } else if (mode === 'fill') {
+                                if (overridenFill) {
+                                    ctx.fillStyle = overridenFill;
+                                } else if (obj.faceColorMode === 'solid') {
+                                    ctx.fillStyle = obj.faceSolidColor || '#ffffff';
+                                } else {
+                                    const tBounds = obj.gradMapping === 'character' ? cBounds : { left: -(ld.totalWidth*scaleX)/2, right: (ld.totalWidth*scaleX)/2, top: -fSize, bottom: 0 };
+                                    ctx.fillStyle = getAdvancedStyle(obj, tBounds);
+                                }
+                                ctx.fillText(cm.char, -targetWidth / 2, 0, targetWidth);
+                            }
+                            ctx.restore();
+                            trackingX += cm.advanceWidth * scaleX;
+                        });
+                        currentLineY += fSize + obj.lineSpacing;
+                    });
+                }
+
+                if(obj.fxLayers) {
+                    for(let i = obj.fxLayers.length - 1; i >= 0; i--) {
+                        let layer = obj.fxLayers[i];
+                        if (layer.type === 'shadow') executeRenderPass('shadow', layer);
+                        if (layer.type === 'edge') executeRenderPass('edge', layer);
+                    }
+                }
+                executeRenderPass('fill');
+
+                if(obj.id === activeObjId && !isExport) {
+                    ctx.save(); ctx.translate(obj.x, obj.y); ctx.rotate((obj.rotate * Math.PI)/180); ctx.translate(-obj.x, -obj.y);
+                    ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2;
+                    ctx.strokeRect(obj.hitBox.x0, obj.hitBox.y0, obj.hitBox.x1 - obj.hitBox.x0, obj.hitBox.y1 - obj.hitBox.y0);
+                    ctx.restore();
+                }
+            });
+
+            if (document.getElementById('showSafety').checked && !isExport) {
+                ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)'; ctx.strokeRect(canvas.width * 0.05, canvas.height * 0.05, canvas.width * 0.9, canvas.height * 0.9);
+                ctx.strokeStyle = 'rgba(255, 61, 0, 0.6)'; ctx.strokeRect(canvas.width * 0.1, canvas.height * 0.1, canvas.width * 0.8, canvas.height * 0.8);
+            }
+        }
+
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (inplaceEditor.style.display === 'block') { closeInplaceEditor(); return; }
+            
+            const coords = getCanvasCoords(e); const now = Date.now(); let clickedObj = null;
+            
+            for(let i = objects.length - 1; i >= 0; i--) {
+                let o = objects[i];
+                if(coords.x >= o.hitBox.x0 && coords.x <= o.hitBox.x1 && coords.y >= o.hitBox.y0 && coords.y <= o.hitBox.y1) { clickedObj = o; break; }
+            }
+
+            if (clickedObj && (now - lastClickTime < 300) && clickedObj.type === 'text') {
+                isDragging = false;
+                openInplaceEditor(clickedObj, e);
+                lastClickTime = now;
+                return;
+            }
+            lastClickTime = now;
+
+            if (clickedObj) {
+                isDragging = true; dragTargetObj = clickedObj; activeObjId = clickedObj.id;
+                dragStartX = coords.x - clickedObj.x; dragStartY = coords.y - clickedObj.y;
+                selectObjectBind();
+            } else {
+                activeObjId = null; isDragging = false; dragTargetObj = null;
+                selectObjectBind();
+            }
+        });
+
+        // --- 直感型インプレイスエディタ制御 V11.7 ---
+        function openInplaceEditor(obj, originEvent) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = obj.scaleX / 100;
+            
+            inplaceEditor.style.display = 'block';
+            
+            // キャンバス解像度とCSS表示サイズのマッピング計算
+            const toCSS = rect.width / canvas.width;
+            
+            inplaceEditor.style.left = `${rect.left + (obj.hitBox.x0 * toCSS)}px`;
+            inplaceEditor.style.top = `${rect.top + (obj.hitBox.y0 * toCSS)}px`;
+            inplaceEditor.style.width = `${(obj.hitBox.x1 - obj.hitBox.x0) * toCSS + 60}px`;
+            inplaceEditor.style.height = `${(obj.hitBox.y1 - obj.hitBox.y0) * toCSS + 20}px`;
+            
+            inplaceEditor.value = obj.text;
+            inplaceEditor.style.fontSize = `${obj.size * toCSS}px`;
+            inplaceEditor.style.fontFamily = obj.font;
+            
+            // 長体比率・斜体をインプレイスエディタのCSS側にも完全同期（打っている最中も直感的に一致）
+            inplaceEditor.style.transformOrigin = "left top";
+            inplaceEditor.style.transform = `skewX(${obj.skewX}deg)`;
+            
+            // テキスト配置の同期
+            inplaceEditor.style.textAlign = obj.align === 'center' ? 'center' : (obj.align === 'right' ? 'right' : 'left');
+
+            inplaceEditor.focus();
+            // 最初は全選択
+            inplaceEditor.setSelectionRange(0, inplaceEditor.value.length);
+            syncSelectionToRange();
+
+            inplaceEditor.oninput = () => {
+                obj.text = inplaceEditor.value;
+                document.getElementById('textStr').value = inplaceEditor.value;
+                drawSystem();
+            };
+        }
+
+        // ドラッグ選択範囲を検出して「部分特殊効果ターゲット」へ即座に流し込む処理
+        function syncSelectionToRange() {
+            const start = inplaceEditor.selectionStart;
+            const end = inplaceEditor.selectionEnd;
+            
+            if (start !== end) {
+                // 文字がドラッグ選択されている時、ソノ区間をインデックスとして登録！
+                document.getElementById('rangeStart').value = start;
+                document.getElementById('rangeEnd').value = end - 1;
+            } else {
+                // 選択が解除されたら部分指定も元に戻す
+                document.getElementById('rangeStart').value = -1;
+                document.getElementById('rangeEnd').value = -1;
+            }
+            drawSystem();
+        }
+
+        // マウスドラッグ、キー選択、ダブルクリック選択の全トリガーを監視
+        inplaceEditor.addEventListener('select', syncSelectionToRange);
+        inplaceEditor.addEventListener('keyup', syncSelectionToRange);
+        inplaceEditor.addEventListener('pointerup', syncSelectionToRange);
+
+        function closeInplaceEditor() { inplaceEditor.style.display = 'none'; drawSystem(); }
+
+        inplaceEditor.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) { e.preventDefault(); closeInplaceEditor(); }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging || !dragTargetObj) return;
+            const coords = getCanvasCoords(e); let tx = coords.x - dragStartX; let ty = coords.y - dragStartY;
+            if (document.getElementById('enableSnap').checked) {
+                const thresh = 25;
+                if (Math.abs(tx - 1920/2) < thresh) tx = 1920/2;
+                if (Math.abs(ty - 1080/2) < thresh) ty = 1080/2;
+            }
+            dragTargetObj.x = Math.round(tx); dragTargetObj.y = Math.round(ty);
+            if(document.getElementById('objX')) document.getElementById('objX').value = dragTargetObj.x;
+            if(document.getElementById('objY')) document.getElementById('objY').value = dragTargetObj.y;
+            drawSystem();
+        });
+        window.addEventListener('mouseup', () => { isDragging = false; dragTargetObj = null; });
+
+        document.getElementById('exportBtn').onclick = () => {
+            closeInplaceEditor(); drawSystem(true);
+            const link = document.createElement('a'); link.download = `deko_v11_7_${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png'); link.click(); drawSystem(false);
+        };
+
+        selectObjectBind();
+    </script>
+</body>
+</html>
