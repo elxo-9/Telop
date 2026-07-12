@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Web DEKO - Professional CG System V11.7</title>
+    <title>Web DEKO - Professional CG System V12.1</title>
     <style>
         :root {
             --bg-main: #121216;
@@ -16,6 +16,9 @@
             background-color: var(--bg-main); color: var(--text);
             margin: 0; padding: 15px; display: flex; height: 100vh;
             box-sizing: border-box; gap: 15px; overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
         .preview-container {
             flex: 1; display: flex; flex-direction: column; background-color: #030305; border-radius: 8px;
@@ -27,13 +30,12 @@
         .use-palt { font-feature-settings: "palt" 1; font-variant-ligatures: no-common-ligatures; }
         canvas { box-shadow: 0 10px 30px rgba(0,0,0,0.7); max-width: 100%; max-height: 82vh; }
 
-        /* 完全直感型インプレイスエディタ（パネル感を撤廃、背景透過で文字を直接上書き） */
         #inplaceEditor {
             position: absolute; display: none; background: transparent;
             color: #fff; border: none; outline: none; margin: 0; padding: 0;
             z-index: 2000; overflow: hidden; font-weight: bold; resize: none;
             line-height: 1.0; white-space: pre; word-wrap: normal;
-            caret-color: var(--accent); /* カーソルを見やすく */
+            caret-color: var(--accent);
             text-shadow: 0 0 4px rgba(0,0,0,0.8);
         }
 
@@ -91,14 +93,14 @@
 
     <div class="control-panel">
         <div class="section" style="border-left-color: #00ffaa;">
-            <h3>🔤 フォント ＆ アセットマネージャー</h3>
+            <h3>🔤 フォントマネージャー</h3>
             <div class="row">
                 アクティブフォント:
                 <select id="fontSelect" onchange="updateActiveObj('font', this.value)" style="width:160px;">
                     <option value="sans-serif">System Sans</option>
                     <option value="serif">System Serif</option>
                 </select>
-                追加: <input type="file" id="fontFile" accept=".ttf,.otf" style="width:150px; font-size:0.7rem;">
+                追加(複数可): <input type="file" id="fontFile" accept=".ttf,.otf" multiple style="width:150px; font-size:0.7rem;">
             </div>
         </div>
 
@@ -147,29 +149,34 @@
             </div>
 
             <div class="section">
-                <h3>2. 精密トランスフォーム＆部分特殊デザイン</h3>
+                <h3>2. 精密トランスフォーム＆部分装飾</h3>
                 <div id="textEditorArea">
                     <div class="row">
                         テキスト内容:<br><textarea id="textStr" oninput="updateActiveObj('text', this.value)"></textarea>
                         行間隔: <input type="number" id="lineSpacing" value="25" style="width:50px;" oninput="updateActiveObj('lineSpacing', this.value)">
                     </div>
                     <div style="background: rgba(0,229,255,0.08); padding: 8px; border-radius: 4px; margin-top: 5px; border: 1px dashed var(--accent);">
-                        <div class="row" style="font-weight: bold; color: var(--accent);">✨ 部分装飾ターゲット指定 (文字ドラッグで自動選択)</div>
+                        <div class="row" style="font-weight: bold; color: var(--accent);">✨ 部分装飾ターゲット指定</div>
                         <div class="row">
-                            適用文字インデックス:
-                            <div>
-                                開始: <input type="number" id="rangeStart" value="-1" min="-1" style="width:45px;" oninput="drawSystem()">
-                                終了: <input type="number" id="rangeEnd" value="-1" min="-1" style="width:45px;" oninput="drawSystem()">
-                            </div>
+                            開始: <input type="number" id="rangeStart" value="-1" min="-1" style="width:45px;" oninput="updateActiveObj('partStart', this.value)">
+                            終了: <input type="number" id="rangeEnd" value="-1" min="-1" style="width:45px;" oninput="updateActiveObj('partEnd', this.value)">
                         </div>
                         <div class="row">
-                            部分色モード:
-                            <select id="partColorMode" style="font-size:0.75rem;" onchange="drawSystem()">
+                            部分色:
+                            <select id="partColorMode" style="font-size:0.75rem;" onchange="updateActiveObj('partMode', this.value)">
                                 <option value="none">指定しない (全共通)</option>
                                 <option value="solid">部分単色カラー</option>
-                                <option value="gold">超高級ゴールド加工</option>
                             </select>
-                            カラー: <input type="color" id="partSolidColor" value="#ffea00" oninput="drawSystem()">
+                            カラー: <input type="color" id="partSolidColor" value="#ffea00" oninput="updateActiveObj('partColor', this.value)">
+                        </div>
+                        <div class="row" style="border-top: 1px dashed #555; padding-top: 6px; margin-top: 6px;">
+                            <label><input type="checkbox" id="partSizeEnabled" onchange="togglePartSize(this.checked)"> サイズを個別指定</label>
+                            <input type="number" id="partSizeVal" value="110" min="10" style="width:60px;" oninput="updateActiveObj('partSize', this.value)" disabled>
+                        </div>
+                        <div class="row">
+                            <label><input type="checkbox" id="partEdgeEnabled" onchange="togglePartEdge(this.checked)"> 縁取りを個別指定</label>
+                            太さ: <input type="number" id="partEdgeSizeVal" value="10" min="0" style="width:50px;" oninput="updateActiveObj('partEdgeSize', this.value)" disabled>
+                            色: <input type="color" id="partEdgeColorVal" value="#ffffff" oninput="updateActiveObj('partEdgeColor', this.value)" disabled>
                         </div>
                     </div>
                 </div>
@@ -179,8 +186,7 @@
                         X: <input type="number" id="objX" value="960" oninput="updateActiveObj('x', this.value)">
                         Y: <input type="number" id="objY" value="756" oninput="updateActiveObj('y', this.value)">
                     </div>
-                    回転 (度):
-                    <input type="number" id="objRotate" value="0" style="width:55px;" oninput="updateActiveObj('rotate', this.value)">
+                    回転: <input type="number" id="objRotate" value="0" style="width:55px;" oninput="updateActiveObj('rotate', this.value)">
                 </div>
                 <div class="row">
                     サイズ:
@@ -205,8 +211,48 @@
                 </div>
             </div>
 
+            <div class="section" style="border-left-color: #e5ff00;">
+                <h3>3. 自動伸縮テキスト背景 (座布団)</h3>
+                <div class="row">
+                    <label><input type="checkbox" id="bgEnabled" onchange="updateBgConfig('enabled', this.checked)"> 背景パネルを表示する</label>
+                </div>
+                <div class="row">
+                    背景カラー: <input type="color" id="bgColorPicker" value="#000000" oninput="updateBgConfig('color', this.value)">
+                    不透明度 (%): <input type="number" id="bgAlpha" value="80" min="0" max="100" oninput="updateBgConfig('alpha', this.value)">
+                </div>
+                <div class="row">
+                    横マージン幅: <input type="number" id="bgPadX" value="35" oninput="updateBgConfig('padX', this.value)">
+                    縦マージン幅: <input type="number" id="bgPadY" value="15" oninput="updateBgConfig('padY', this.value)">
+                </div>
+                <div class="row">
+                    位置オフセットY: <input type="number" id="bgOffsetY" value="0" oninput="updateBgConfig('offsetY', this.value)">
+                </div>
+                <div class="row" style="border-top: 1px dashed #555; padding-top: 5px; margin-top: 5px;">
+                    背景アウトライン太さ: <input type="number" id="bgBorderSize" value="0" min="0" oninput="updateBgConfig('borderSize', this.value)">
+                    アウトライン色: <input type="color" id="bgBorderColor" value="#ffffff" oninput="updateBgConfig('borderColor', this.value)">
+                </div>
+            </div>
+
+            <div class="section" style="border-left-color: #ff00aa;">
+                <h3>✏️ 4. 下線 (アンダーライン) 装飾機能</h3>
+                <div class="row">
+                    <label><input type="checkbox" id="underlineEnabled" onchange="updateUnderlineConfig('enabled', this.checked)"> 下線を表示する</label>
+                </div>
+                <div class="row">
+                    線の太さ: <input type="number" id="underlineThickness" value="8" min="1" oninput="updateUnderlineConfig('thickness', this.value)">
+                    位置(オフセット): <input type="number" id="underlineOffsetY" value="12" oninput="updateUnderlineConfig('offsetY', this.value)">
+                </div>
+                <div class="row">
+                    線のカラー: <input type="color" id="underlineColor" value="#ffffff" oninput="updateUnderlineConfig('color', this.value)">
+                </div>
+                <div class="row" style="border-top: 1px dashed #555; padding-top: 5px; margin-top: 5px;">
+                    下線フチ太さ: <input type="number" id="underlineBorderSize" value="0" min="0" oninput="updateUnderlineConfig('borderSize', this.value)">
+                    下線フチ色: <input type="color" id="underlineBorderColor" value="#000000" oninput="updateUnderlineConfig('borderColor', this.value)">
+                </div>
+            </div>
+
             <div class="section">
-                <h3>3. 高級フェイスエフェクト</h3>
+                <h3>5. 高級フェイスエフェクト</h3>
                 <div class="row">
                     塗りモード:
                     <select id="faceColorMode" onchange="updateActiveObj('faceColorMode', this.value); toggleFaceUI();">
@@ -219,14 +265,9 @@
                         <option value="total">全体一律</option>
                     </select>
                 </div>
-
                 <div id="solidColorSection" style="display:none; margin: 10px 0;">
-                    <div class="row">
-                        フェースカラー指定:
-                        <input type="color" id="faceSolidColorPicker" value="#ffffff" oninput="updateActiveObj('faceSolidColor', this.value)">
-                    </div>
+                    <div class="row">カラー指定: <input type="color" id="faceSolidColorPicker" value="#ffffff" oninput="updateActiveObj('faceSolidColor', this.value)"></div>
                 </div>
-
                 <div id="gradBarSection">
                     <div class="row">角度 (度): <input type="number" id="gradAngle" value="90" style="width:60px;" oninput="updateActiveObj('gradAngle', this.value)"></div>
                     <div class="grad-bar-wrapper" id="gradBarWrapper">
@@ -253,10 +294,13 @@
             </div>
         </div>
 
-        <div class="row" style="margin-top:auto; border-top: 1px solid #3a3a48; padding-top:10px;">
+        <div class="row" style="margin-top:auto; border-top: 1px solid #3a3a48; padding-top:10px; flex-wrap: wrap; gap: 6px;">
             <label><input type="checkbox" id="showSafety" checked onchange="drawSystem()"> セーフティ表示</label>
             <button class="btn btn-danger" onclick="deleteActiveObject()" style="padding:5px 10px;">アクティブ削除</button>
-            <button class="btn" id="exportBtn" style="background:var(--accent); color:#000; font-weight:bold; padding:8px 15px;">PNG書き出し</button>
+            <button class="btn" id="exportBtn" style="background:var(--accent); color:#000; font-weight:bold; padding:5px 10px;">PNG書き出し</button>
+            <button class="btn" onclick="saveConfig()" style="background:#00aa55; color:#fff; font-weight:bold; padding:5px 10px;">設定を保存</button>
+            <input type="file" id="configLoader" accept=".json" style="display:none;" onchange="loadConfig(this)">
+            <button class="btn" onclick="document.getElementById('configLoader').click()" style="background:#aa00aa; color:#fff; font-weight:bold; padding:5px 10px;">設定を読み込む</button>
         </div>
     </div>
 
@@ -267,17 +311,22 @@
 
         let bgMode = 'check-d';
         let customBgColor = '#030305';
+        let loadedFonts = []; 
 
         let objects = [
             {
-                id: 'track_1', type: 'text', text: "ダブルクリックで\n画面上で直接変えられるヨ！",
-                x: 1920/2, y: 1080*0.65, size: 110, scaleX: 100, skewX: 0, rotate: 0, lineSpacing: 25,
+                id: 'track_1', type: 'text', text: "調整用タイムラインが\nここにもついたヨ！",
+                x: 1920/2, y: 1080*0.55, size: 110, scaleX: 100, skewX: 0, rotate: 0, lineSpacing: 25,
                 align: 'center', stackMode: 'center', font: 'sans-serif',
                 faceColorMode: 'gradient', faceSolidColor: '#ffffff', gradMapping: 'character', gradAngle: 90,
                 gradMarkers: [{pos:0, color:'#ffffff'}, {pos:100, color:'#00e5ff'}],
+                partStart: -1, partEnd: -1, partMode: 'none', partColor: '#ffea00',
+                partSize: null, partEdgeColor: null, partEdgeSize: null,
+                textBg: { enabled: true, color: '#000000', alpha: 75, padX: 35, padY: 15, offsetY: 0, borderSize: 4, borderColor: '#00ffff' },
+                underline: { enabled: false, thickness: 8, offsetY: 12, color: '#ffffff', borderSize: 0, borderColor: '#000000' },
                 fxLayers: [
                     { type: 'edge', mode: 'gradient', color: '#000000', gradAngle: 90, gradMarkers: [{pos:0, color:'#ff0055'}, {pos:100, color:'#220011'}], size: 22 },
-                    { type: 'shadow', mode: 'solid', color: '#000000', thickness: 10, blur: 12, ox: 12, oy: -12 }
+                    { type: 'shadow', mode: 'solid', color: '#000000', thickness: 0, blur: 20, ox: 15, oy: -15 }
                 ],
                 hitBox: { x0: 0, y0: 0, x1: 0, y1: 0 }
             }
@@ -317,6 +366,22 @@
             return objects.find(o => o.id === activeObjId) || null;
         }
 
+        function updateBgConfig(prop, val) {
+            const obj = getActiveObj(); if(!obj) return;
+            if(!obj.textBg) obj.textBg = { enabled: false, color: '#000000', alpha: 80, padX: 35, padY: 15, offsetY:0, borderSize:0, borderColor:'#ffffff' };
+            if(['alpha', 'padX', 'padY', 'offsetY', 'borderSize'].includes(prop)) val = parseInt(val) || 0;
+            obj.textBg[prop] = val;
+            drawSystem();
+        }
+
+        function updateUnderlineConfig(prop, val) {
+            const obj = getActiveObj(); if(!obj) return;
+            if(!obj.underline) obj.underline = { enabled: false, thickness: 8, offsetY: 12, color: '#ffffff', borderSize: 0, borderColor: '#000000' };
+            if(['thickness', 'offsetY', 'borderSize'].includes(prop)) val = parseInt(val) || 0;
+            obj.underline[prop] = val;
+            drawSystem();
+        }
+
         function changeStackModeSafe() {
             const obj = getActiveObj(); if(!obj) return;
             const oldMode = obj.stackMode;
@@ -353,7 +418,7 @@
                 if (obj.type !== 'text' || obj.align === 'center') { obj.x = 1920 / 2; }
                 else {
                     const lines = obj.text.split('\n');
-                    ctx.save(); ctx.font = `bold ${obj.size}px ${obj.font}`;
+                    ctx.save(); ctx.font = `${obj.size}px ${obj.font}`;
                     let maxWidth = 0;
                     lines.forEach(l => {
                         const w = ctx.measureText(l).width * (obj.scaleX / 100);
@@ -369,12 +434,16 @@
 
         function updateActiveObj(prop, val) {
             const obj = getActiveObj(); if (!obj) return;
-            if (['size', 'scaleX', 'skewX', 'lineSpacing', 'x', 'y', 'rotate'].includes(prop)) val = parseInt(val) || 0;
+            if (['size', 'scaleX', 'skewX', 'lineSpacing', 'x', 'y', 'rotate', 'partStart', 'partEnd', 'partSize', 'partEdgeSize'].includes(prop)) val = parseInt(val) || 0;
             obj[prop] = val;
             if (prop === 'x') document.getElementById('objX').value = val;
             if (prop === 'y') document.getElementById('objY').value = val;
             if (prop === 'text') document.getElementById('textStr').value = val;
             if (prop === 'rotate') document.getElementById('objRotate').value = val;
+            if (prop === 'partStart') document.getElementById('rangeStart').value = val;
+            if (prop === 'partEnd') document.getElementById('rangeEnd').value = val;
+            if (prop === 'partMode') document.getElementById('partColorMode').value = val;
+            if (prop === 'partColor') document.getElementById('partSolidColor').value = val;
             drawSystem();
         }
 
@@ -384,6 +453,30 @@
             document.getElementById('gradBarSection').style.display = isGrad ? 'block' : 'none';
             document.getElementById('solidColorSection').style.display = isGrad ? 'none' : 'block';
             document.getElementById('gradMapping').disabled = !isGrad;
+        }
+
+        function togglePartSize(checked) {
+            const obj = getActiveObj(); if(!obj) return;
+            const input = document.getElementById('partSizeVal');
+            input.disabled = !checked;
+            obj.partSize = checked ? (obj.partSize || obj.size) : null;
+            if (checked) input.value = obj.partSize;
+            drawSystem();
+        }
+
+        function togglePartEdge(checked) {
+            const obj = getActiveObj(); if(!obj) return;
+            const sizeInput = document.getElementById('partEdgeSizeVal');
+            const colorInput = document.getElementById('partEdgeColorVal');
+            sizeInput.disabled = !checked; colorInput.disabled = !checked;
+            if (checked) {
+                obj.partEdgeSize = obj.partEdgeSize ?? 10;
+                obj.partEdgeColor = obj.partEdgeColor || '#ffffff';
+                sizeInput.value = obj.partEdgeSize; colorInput.value = obj.partEdgeColor;
+            } else {
+                obj.partEdgeSize = null; obj.partEdgeColor = null;
+            }
+            drawSystem();
         }
 
         function updateTrackSelector() {
@@ -410,6 +503,40 @@
             if (obj.type === 'text') {
                 document.getElementById('textStr').value = obj.text;
                 document.getElementById('lineSpacing').value = obj.lineSpacing;
+                document.getElementById('fontSelect').value = obj.font || 'sans-serif';
+                
+                document.getElementById('rangeStart').value = obj.partStart ?? -1;
+                document.getElementById('rangeEnd').value = obj.partEnd ?? -1;
+                document.getElementById('partColorMode').value = obj.partMode || 'none';
+                document.getElementById('partSolidColor').value = obj.partColor || '#ffea00';
+
+                document.getElementById('partSizeEnabled').checked = obj.partSize != null;
+                document.getElementById('partSizeVal').value = obj.partSize ?? obj.size;
+                document.getElementById('partSizeVal').disabled = obj.partSize == null;
+
+                document.getElementById('partEdgeEnabled').checked = obj.partEdgeColor != null;
+                document.getElementById('partEdgeSizeVal').value = obj.partEdgeSize ?? 10;
+                document.getElementById('partEdgeColorVal').value = obj.partEdgeColor ?? '#ffffff';
+                document.getElementById('partEdgeSizeVal').disabled = obj.partEdgeColor == null;
+                document.getElementById('partEdgeColorVal').disabled = obj.partEdgeColor == null;
+
+                if(!obj.textBg) obj.textBg = { enabled: false, color: '#000000', alpha: 80, padX: 35, padY: 15, offsetY: 0, borderSize:0, borderColor:'#ffffff' };
+                document.getElementById('bgEnabled').checked = obj.textBg.enabled;
+                document.getElementById('bgColorPicker').value = obj.textBg.color || '#000000';
+                document.getElementById('bgAlpha').value = obj.textBg.alpha ?? 80;
+                document.getElementById('bgPadX').value = obj.textBg.padX ?? 35;
+                document.getElementById('bgPadY').value = obj.textBg.padY ?? 15;
+                document.getElementById('bgOffsetY').value = obj.textBg.offsetY ?? 0;
+                document.getElementById('bgBorderSize').value = obj.textBg.borderSize ?? 0;
+                document.getElementById('bgBorderColor').value = obj.textBg.borderColor || '#ffffff';
+
+                if(!obj.underline) obj.underline = { enabled: false, thickness: 8, offsetY: 12, color: '#ffffff', borderSize: 0, borderColor: '#000000' };
+                document.getElementById('underlineEnabled').checked = obj.underline.enabled;
+                document.getElementById('underlineThickness').value = obj.underline.thickness ?? 8;
+                document.getElementById('underlineOffsetY').value = obj.underline.offsetY ?? 12;
+                document.getElementById('underlineColor').value = obj.underline.color || '#ffffff';
+                document.getElementById('underlineBorderSize').value = obj.underline.borderSize ?? 0;
+                document.getElementById('underlineBorderColor').value = obj.underline.borderColor || '#000000';
             }
             
             document.getElementById('fontSize').value = obj.size;
@@ -437,9 +564,13 @@
             objects.push({
                 id: id, type: 'text', text: "新規タイトル",
                 x: 1920/2, y: 1080/2, size: 110, scaleX: 100, skewX: 0, rotate: 0, lineSpacing: 15,
-                align: 'center', stackMode: 'center', font: 'sans-serif',
+                align: 'center', stackMode: 'center', font: document.getElementById('fontSelect').value || 'sans-serif',
                 faceColorMode: 'solid', faceSolidColor: '#ffffff', gradMapping: 'total', gradAngle: 90,
                 gradMarkers: [{pos:0, color:'#00ffff'}, {pos:100, color:'#0055ff'}],
+                partStart: -1, partEnd: -1, partMode: 'none', partColor: '#ffea00',
+                partSize: null, partEdgeColor: null, partEdgeSize: null,
+                textBg: { enabled: false, color: '#000000', alpha: 80, padX: 35, padY: 15, offsetY: 0, borderSize: 0, borderColor: '#ffffff' },
+                underline: { enabled: false, thickness: 8, offsetY: 12, color: '#ffffff', borderSize: 0, borderColor: '#000000' },
                 fxLayers: [{ type: 'edge', mode: 'solid', color: '#000000', size: 15 }]
             });
             activeObjId = id; selectObjectBind();
@@ -452,14 +583,46 @@
         }
 
         document.getElementById('fontFile').onchange = async (e) => {
-            const file = e.target.files[0]; if (!file) return;
-            const fontId = "FontPool_" + Date.now();
-            const fontFace = new FontFace(fontId, await file.arrayBuffer());
-            await fontFace.load(); document.fonts.add(fontFace);
-            const opt = document.createElement('option'); opt.value = fontId; opt.innerText = file.name;
-            const sel = document.getElementById('fontSelect'); sel.appendChild(opt); sel.value = fontId;
-            updateActiveObj('font', fontId);
+            const files = e.target.files; if (!files || files.length === 0) return;
+            for(let i=0; i<files.length; i++){
+                const file = files[i];
+                await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        const fontId = "FontPool_" + Date.now() + "_" + Math.floor(Math.random()*1000);
+                        const dataUrl = event.target.result;
+                        await registerFontData(fontId, dataUrl, file.name);
+                        updateActiveObj('font', fontId);
+                        resolve();
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
         };
+
+        async function registerFontData(fontId, dataUrl, displayName) {
+            try {
+                const res = await fetch(dataUrl);
+                const buffer = await res.arrayBuffer();
+                const fontFace = new FontFace(fontId, buffer);
+                await fontFace.load();
+                document.fonts.add(fontFace);
+                
+                const sel = document.getElementById('fontSelect');
+                if(![...sel.options].some(o => o.value === fontId)) {
+                    const opt = document.createElement('option');
+                    opt.value = fontId; opt.innerText = displayName;
+                    sel.appendChild(opt);
+                }
+                sel.value = fontId;
+
+                if(!loadedFonts.some(f => f.id === fontId)) {
+                    loadedFonts.push({ id: fontId, name: displayName, data: dataUrl });
+                }
+            } catch(err) {
+                console.error("Font load failed:", err);
+            }
+        }
 
         function renderGradTimeline() {
             const obj = getActiveObj(); if (!obj || !obj.gradMarkers) return;
@@ -542,7 +705,7 @@
                 if(ce.target !== wrapper && ce.target !== preview) return;
                 const rect = wrapper.getBoundingClientRect();
                 let p = Math.round(((ce.clientX - rect.left) / rect.width) * 100);
-                layer.gradMarkers.push({pos: p, color: '#ff00ee'});
+                layer.gradMarkers.push({pos: p, color: '#ffffff'});
                 layerSelectedMarkerIdx[index] = layer.gradMarkers.length - 1;
                 renderLayerPanel(); drawSystem();
             });
@@ -569,12 +732,12 @@
                         <button class="btn btn-danger" onclick="deleteFXLayer(${index})" style="margin-left:auto; padding:2px 5px;">✕</button>
                     </div>
                     <div class="row style-color-row" id="colorRow_${index}">
-                        角度:<input type="number" class="fx-input ignore-drag" data-prop="gradAngle" data-idx="${index}" value="${layer.gradAngle||90}" style="width:40px;">
+                        角度:<input type="number" class="fx-input-angle ignore-drag" data-prop="gradAngle" data-idx="${index}" value="${layer.gradAngle||90}" style="width:40px;">
                         ${layer.mode === 'gradient' ? `
                             選択点の色:<input type="color" class="layer-picker-${index} ignore-drag" value="${layer.gradMarkers && layer.gradMarkers[layerSelectedMarkerIdx[index]] ? layer.gradMarkers[layerSelectedMarkerIdx[index]].color : '#ffffff'}">
                             <button class="btn btn-danger" onclick="deleteLayerMarker(${index})" style="padding:1px 4px; font-size:0.65rem;">点削除</button>
                         ` : `
-                            カラー:<input type="color" class="fx-input ignore-drag" data-prop="color" data-idx="${index}" value="${layer.color||'#000000'}">
+                            カラー:<input type="color" class="fx-input-color ignore-drag" data-prop="color" data-idx="${index}" value="${layer.color||'#000000'}">
                         `}
                     </div>
                 `;
@@ -589,8 +752,7 @@
                         </div>`;
                 } else {
                     controlsHTML += `
-                        <div class="row">太さ:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="thickness" data-idx="${index}" min="0" max="100" value="${layer.thickness}"><input type="number" class="fx-input-num ignore-drag" data-prop="thickness" data-idx="${index}" value="${layer.thickness}"></div></div>
-                        <div class="row">ぼかし:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="blur" data-idx="${index}" min="0" max="100" value="${layer.blur}"><input type="number" class="fx-input-num ignore-drag" data-prop="blur" data-idx="${index}" value="${layer.blur}"></div></div>
+                        <div class="row">影ぼかし:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="blur" data-idx="${index}" min="0" max="100" value="${layer.blur}"><input type="number" class="fx-input-num ignore-drag" data-prop="blur" data-idx="${index}" value="${layer.blur}"></div></div>
                         <div class="row">位置 X:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="ox" data-idx="${index}" min="-100" max="100" value="${layer.ox}"><input type="number" class="fx-input-num ignore-drag" data-prop="ox" data-idx="${index}" value="${layer.ox}"></div></div>
                         <div class="row">位置 Y:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="oy" data-idx="${index}" min="-100" max="100" value="${layer.oy}"><input type="number" class="fx-input-num ignore-drag" data-prop="oy" data-idx="${index}" value="${layer.oy}"></div></div>
                     `;
@@ -643,10 +805,16 @@
                     e.target.previousElementSibling.value = e.target.value; drawSystem();
                 };
             });
-            container.querySelectorAll('.fx-input').forEach(input => {
+            container.querySelectorAll('.fx-input-angle').forEach(input => {
                 input.oninput = (e) => {
                     const idx = e.target.dataset.idx; const prop = e.target.dataset.prop;
                     obj.fxLayers[idx][prop] = parseInt(e.target.value) || 0; drawSystem();
+                };
+            });
+            container.querySelectorAll('.fx-input-color').forEach(input => {
+                input.oninput = (e) => {
+                    const idx = e.target.dataset.idx; const prop = e.target.dataset.prop;
+                    obj.fxLayers[idx][prop] = e.target.value; drawSystem();
                 };
             });
             container.querySelectorAll('.fx-mode-select').forEach(sel => {
@@ -692,13 +860,13 @@
             if (type === 'edge') {
                 obj.fxLayers.unshift({ type: 'edge', mode: 'solid', color: '#000000', gradAngle: 90, gradMarkers: [{pos:0, color:'#fff'}, {pos:100, color:'#000'}], size: 16 });
             } else if (type === 'shadow') {
-                obj.fxLayers.unshift({ type: 'shadow', mode: 'solid', color: '#000000', gradAngle: 90, gradMarkers: [{pos:0, color:'#fff'}, {pos:100, color:'#000'}], thickness: 10, blur: 15, ox: 12, oy: -12 });
+                obj.fxLayers.unshift({ type: 'shadow', mode: 'solid', color: '#000000', gradAngle: 90, gradMarkers: [{pos:0, color:'#fff'}, {pos:100, color:'#000'}], thickness: 0, blur: 15, ox: 12, oy: -12 });
             }
             renderLayerPanel(); drawSystem();
         }
         function deleteFXLayer(idx) { const obj = getActiveObj(); if(obj) obj.fxLayers.splice(idx, 1); renderLayerPanel(); drawSystem(); }
 
-        // --- コアレンダリングエンジン V11.7 ---
+        // --- レンダリングコア V12.1 ---
         function drawSystem(isExport = false) {
             if (isExport) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -714,11 +882,6 @@
                 }
             }
 
-            const rStart = parseInt(document.getElementById('rangeStart')?.value) ?? -1;
-            const rEnd = parseInt(document.getElementById('rangeEnd')?.value) ?? -1;
-            const pMode = document.getElementById('partColorMode')?.value ?? 'none';
-            const pColor = document.getElementById('partSolidColor')?.value ?? '#ffea00';
-
             objects.forEach(obj => {
                 if (obj.type === 'image') return;
                 const lines = obj.text.split('\n');
@@ -728,36 +891,106 @@
                 const scaleX = obj.scaleX / 100;
                 const skewX = (obj.skewX * Math.PI) / 180;
                 ctx.canvas.style.fontFeatureSettings = '"palt" 1';
-                ctx.font = `bold ${fSize}px ${obj.font}`;
-                ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.textBaseline = 'alphabetic';
+                ctx.font = `${fSize}px ${obj.font}`;
+                ctx.lineJoin = 'miter'; ctx.miterLimit = 10; ctx.textBaseline = 'alphabetic';
 
                 let lineData = [];
                 let maxLineWidth = 0;
                 let absoluteCharIdx = 0;
 
+                const rStart = obj.partStart ?? -1;
+                const rEnd = obj.partEnd ?? -1;
+                const pMode = obj.partMode || 'none';
+                const pColor = obj.partColor || '#ffea00';
+
                 lines.forEach((lineText) => {
                     let lineAdvance = 0;
                     let chars = lineText.split('').map(char => {
-                        const m = ctx.measureText(char);
-                        lineAdvance += m.width;
                         let currentIdx = absoluteCharIdx++;
                         let isTarget = (rStart !== -1 && rEnd !== -1 && currentIdx >= rStart && currentIdx <= rEnd);
-                        return { char, advanceWidth: m.width, isTarget };
+                        const charSize = (isTarget && obj.partSize) ? obj.partSize : fSize;
+                        if (charSize !== fSize) ctx.font = `${charSize}px ${obj.font}`;
+                        const m = ctx.measureText(char);
+                        if (charSize !== fSize) ctx.font = `${fSize}px ${obj.font}`;
+                        lineAdvance += m.width;
+                        return { char, advanceWidth: m.width, isTarget, size: charSize };
                     });
-                    absoluteCharIdx++; // 改行コード分進める
+                    absoluteCharIdx++; 
                     if(lineAdvance * scaleX > maxLineWidth) maxLineWidth = lineAdvance * scaleX;
                     lineData.push({ chars, totalWidth: lineAdvance });
                 });
 
                 const totalH = (lines.length * fSize) + ((lines.length - 1) * obj.lineSpacing);
-                let startOffsetY = obj.stackMode === 'center' ? -totalH/2 + fSize*0.8 : (obj.stackMode === 'up' ? -totalH + fSize*0.8 : fSize*0.8);
+                let textVisualHeight = totalH - (fSize * 0.15);
+                let startOffsetY = obj.stackMode === 'center' ? -textVisualHeight/2 + fSize*0.72 : (obj.stackMode === 'up' ? -textVisualHeight + fSize*0.72 : fSize*0.72);
 
                 obj.hitBox = {
                     x0: obj.align === 'center' ? obj.x - maxLineWidth/2 : (obj.align === 'right' ? obj.x - maxLineWidth : obj.x),
-                    y0: obj.y + startOffsetY - fSize*0.8,
+                    y0: obj.y + startOffsetY - fSize*0.72,
                     x1: (obj.align === 'center' ? obj.x - maxLineWidth/2 : (obj.align === 'right' ? obj.x - maxLineWidth : obj.x)) + maxLineWidth,
-                    y1: obj.y + startOffsetY + totalH - fSize*0.2
+                    y1: obj.y + startOffsetY - fSize*0.72 + textVisualHeight
                 };
+
+                // 1. 自動伸縮背景（座布団）パネルの描画
+                if (obj.textBg && obj.textBg.enabled) {
+                    ctx.save();
+                    ctx.lineJoin = 'miter'; ctx.miterLimit = 10; 
+                    ctx.translate(obj.x, obj.y); ctx.rotate((obj.rotate * Math.PI) / 180); ctx.translate(-obj.x, -obj.y);
+                    
+                    const padX = obj.textBg.padX ?? 35;
+                    const padY = obj.textBg.padY ?? 15;
+                    const bgYOffset = obj.textBg.offsetY ?? 0;
+                    
+                    const bx = obj.hitBox.x0 - padX;
+                    const by = obj.hitBox.y0 - padY + bgYOffset;
+                    const bw = (obj.hitBox.x1 - obj.hitBox.x0) + (padX * 2);
+                    const bh = (obj.hitBox.y1 - obj.hitBox.y0) + (padY * 2);
+                    
+                    ctx.fillStyle = obj.textBg.color || '#000000';
+                    ctx.globalAlpha = (obj.textBg.alpha ?? 80) / 100;
+                    ctx.fillRect(bx, by, bw, bh);
+                    
+                    const bSize = obj.textBg.borderSize ?? 0;
+                    if (bSize > 0) {
+                        ctx.globalAlpha = 1.0; 
+                        ctx.strokeStyle = obj.textBg.borderColor || '#ffffff';
+                        ctx.lineWidth = bSize;
+                        ctx.strokeRect(bx - bSize/2, by - bSize/2, bw + bSize, bh + bSize);
+                    }
+                    ctx.restore();
+                }
+
+                // 2. 高度な下線（アンダーライン）機能の描画ロジック
+                if (obj.underline && obj.underline.enabled) {
+                    ctx.save();
+                    ctx.lineJoin = 'miter'; ctx.miterLimit = 10; ctx.lineCap = 'square'; 
+                    ctx.translate(obj.x, obj.y); ctx.rotate((obj.rotate * Math.PI) / 180); ctx.translate(-obj.x, -obj.y);
+
+                    let currentLineY = obj.y + startOffsetY;
+                    lineData.forEach(ld => {
+                        let lineStartX = obj.align === 'center' ? obj.x - (ld.totalWidth * scaleX)/2 : (obj.align === 'right' ? obj.x - ld.totalWidth * scaleX : obj.x);
+                        let lineEndX = lineStartX + (ld.totalWidth * scaleX);
+                        let lineY = currentLineY + (obj.underline.offsetY ?? 12);
+
+                        const ulBSize = obj.underline.borderSize ?? 0;
+                        if (ulBSize > 0) {
+                            ctx.save();
+                            ctx.strokeStyle = obj.underline.borderColor || '#000000';
+                            ctx.lineWidth = (obj.underline.thickness ?? 8) + (ulBSize * 2);
+                            ctx.beginPath(); ctx.moveTo(lineStartX, lineY); ctx.lineTo(lineEndX, lineY); ctx.stroke();
+                            ctx.restore();
+                        }
+
+                        ctx.save();
+                        ctx.strokeStyle = obj.underline.color || '#ffffff';
+                        ctx.lineWidth = obj.underline.thickness ?? 8;
+                        ctx.beginPath(); ctx.moveTo(lineStartX, lineY); ctx.lineTo(lineEndX, lineY); ctx.stroke();
+                        ctx.restore();
+
+                        currentLineY += fSize + obj.lineSpacing;
+                    });
+                    ctx.restore();
+                }
 
                 function getAdvancedStyle(layerOrObj, bounds) {
                     let markers = layerOrObj.gradMarkers || layerOrObj.markers;
@@ -779,14 +1012,12 @@
 
                         ld.chars.forEach(cm => {
                             ctx.save(); 
-                            // 回転軸のトランスフォーム
                             ctx.translate(obj.x, obj.y); ctx.rotate((obj.rotate * Math.PI) / 180); ctx.translate(-obj.x, -obj.y);
                             
                             const charCenterX = trackingX + (cm.advanceWidth * scaleX) / 2;
                             ctx.translate(charCenterX, currentLineY);
-                            
-                            // 【超重要】斜体（skewX）のみ行列変形をかけ、長体は引数のmaxWidthで処理
                             ctx.transform(1, 0, Math.tan(skewX), 1, 0, 0);
+                            ctx.font = `${cm.size}px ${obj.font}`;
 
                             const targetWidth = cm.advanceWidth * scaleX;
                             const cBounds = { left: -targetWidth/2, right: targetWidth/2, top: -fSize, bottom: fSize*0.2 };
@@ -794,39 +1025,43 @@
                             let overridenFill = null;
                             if (cm.isTarget && pMode !== 'none') {
                                 if (pMode === 'solid') overridenFill = pColor;
-                                else if (pMode === 'gold') {
-                                    let goldGrad = ctx.createLinearGradient(0, -fSize, 0, fSize*0.2);
-                                    goldGrad.addColorStop(0, '#fff3a3'); goldGrad.addColorStop(0.3, '#f1c40f');
-                                    goldGrad.addColorStop(0.5, '#b7860b'); goldGrad.addColorStop(0.8, '#f39c12');
-                                    goldGrad.addColorStop(1, '#fffdf0');
-                                    overridenFill = goldGrad;
+                                else if (pMode === 'gradient') {
+                                    const tBounds = obj.gradMapping === 'character' ? cBounds : { left: -(ld.totalWidth*scaleX)/2, right: (ld.totalWidth*scaleX)/2, top: -fSize, bottom: 0 };
+                                    overridenFill = getAdvancedStyle(obj, tBounds);
                                 }
                             }
 
+                            ctx.lineJoin = 'round'; 
+
                             if (mode === 'shadow') {
                                 ctx.save();
+                                let style = layer.mode === 'gradient' ? getAdvancedStyle(layer, cBounds) : layer.color;
                                 if (layer.blur > 0) {
-                                    ctx.shadowColor = (layer.mode === 'gradient' && layer.gradMarkers) ? layer.gradMarkers[0].color : layer.color;
-                                    ctx.shadowBlur = layer.blur; ctx.shadowOffsetX = layer.ox; ctx.shadowOffsetY = -layer.oy;
+                                    ctx.shadowColor = (layer.mode === 'gradient' && layer.gradMarkers && layer.gradMarkers[0]) ? layer.gradMarkers[0].color : layer.color;
+                                    ctx.shadowBlur = layer.blur;
+                                    ctx.shadowOffsetX = layer.ox;
+                                    ctx.shadowOffsetY = -layer.oy;
                                 } else {
                                     ctx.translate(layer.ox, -layer.oy);
                                 }
-                                let style = layer.mode === 'gradient' ? getAdvancedStyle(layer, cBounds) : layer.color;
                                 ctx.fillStyle = style;
-                                if (layer.thickness > 0) { 
-                                    ctx.strokeStyle = style; 
-                                    ctx.lineWidth = layer.thickness; // 長体に依存せず常に均等
-                                    ctx.strokeText(cm.char, -targetWidth / 2, 0, targetWidth); 
-                                }
                                 ctx.fillText(cm.char, -targetWidth / 2, 0, targetWidth);
                                 ctx.restore();
 
                             } else if (mode === 'edge') {
-                                ctx.strokeStyle = layer.mode === 'gradient' ? getAdvancedStyle(layer, cBounds) : layer.color;
-                                ctx.lineWidth = layer.size; // 【解決】長体比率で割るコトを廃止し、歪みのない均等な絶対サイズを維持！
-                                ctx.strokeText(cm.char, -targetWidth / 2, 0, targetWidth); // 第4引数による長体化で線が真円をキープ
+                                if (cm.isTarget && obj.partEdgeColor) {
+                                    ctx.strokeStyle = obj.partEdgeColor;
+                                    ctx.lineWidth = obj.partEdgeSize ?? layer.size;
+                                } else {
+                                    ctx.strokeStyle = layer.mode === 'gradient' ? getAdvancedStyle(layer, cBounds) : layer.color;
+                                    ctx.lineWidth = layer.size;
+                                }
+                                ctx.strokeText(cm.char, -targetWidth / 2, 0, targetWidth);
 
                             } else if (mode === 'fill') {
+                                ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+                                ctx.globalCompositeOperation = 'source-over';
+                                
                                 if (overridenFill) {
                                     ctx.fillStyle = overridenFill;
                                 } else if (obj.faceColorMode === 'solid') {
@@ -874,7 +1109,6 @@
 
         canvas.addEventListener('mousedown', (e) => {
             if (inplaceEditor.style.display === 'block') { closeInplaceEditor(); return; }
-            
             const coords = getCanvasCoords(e); const now = Date.now(); let clickedObj = null;
             
             for(let i = objects.length - 1; i >= 0; i--) {
@@ -900,14 +1134,9 @@
             }
         });
 
-        // --- 直感型インプレイスエディタ制御 V11.7 ---
         function openInplaceEditor(obj, originEvent) {
             const rect = canvas.getBoundingClientRect();
-            const scaleX = obj.scaleX / 100;
-            
             inplaceEditor.style.display = 'block';
-            
-            // キャンバス解像度とCSS表示サイズのマッピング計算
             const toCSS = rect.width / canvas.width;
             
             inplaceEditor.style.left = `${rect.left + (obj.hitBox.x0 * toCSS)}px`;
@@ -918,18 +1147,11 @@
             inplaceEditor.value = obj.text;
             inplaceEditor.style.fontSize = `${obj.size * toCSS}px`;
             inplaceEditor.style.fontFamily = obj.font;
-            
-            // 長体比率・斜体をインプレイスエディタのCSS側にも完全同期（打っている最中も直感的に一致）
             inplaceEditor.style.transformOrigin = "left top";
             inplaceEditor.style.transform = `skewX(${obj.skewX}deg)`;
-            
-            // テキスト配置の同期
             inplaceEditor.style.textAlign = obj.align === 'center' ? 'center' : (obj.align === 'right' ? 'right' : 'left');
 
             inplaceEditor.focus();
-            // 最初は全選択
-            inplaceEditor.setSelectionRange(0, inplaceEditor.value.length);
-            syncSelectionToRange();
 
             inplaceEditor.oninput = () => {
                 obj.text = inplaceEditor.value;
@@ -938,24 +1160,20 @@
             };
         }
 
-        // ドラッグ選択範囲を検出して「部分特殊効果ターゲット」へ即座に流し込む処理
         function syncSelectionToRange() {
+            const obj = getActiveObj();
+            if (!obj || inplaceEditor.style.display !== 'block') return;
             const start = inplaceEditor.selectionStart;
             const end = inplaceEditor.selectionEnd;
-            
             if (start !== end) {
-                // 文字がドラッグ選択されている時、ソノ区間をインデックスとして登録！
+                obj.partStart = start;
+                obj.partEnd = end - 1;
                 document.getElementById('rangeStart').value = start;
                 document.getElementById('rangeEnd').value = end - 1;
-            } else {
-                // 選択が解除されたら部分指定も元に戻す
-                document.getElementById('rangeStart').value = -1;
-                document.getElementById('rangeEnd').value = -1;
             }
             drawSystem();
         }
 
-        // マウスドラッグ、キー選択、ダブルクリック選択の全トリガーを監視
         inplaceEditor.addEventListener('select', syncSelectionToRange);
         inplaceEditor.addEventListener('keyup', syncSelectionToRange);
         inplaceEditor.addEventListener('pointerup', syncSelectionToRange);
@@ -983,9 +1201,58 @@
 
         document.getElementById('exportBtn').onclick = () => {
             closeInplaceEditor(); drawSystem(true);
-            const link = document.createElement('a'); link.download = `deko_v11_7_${Date.now()}.png`;
+            const link = document.createElement('a'); link.download = `deko_v12_1_${Date.now()}.png`;
             link.href = canvas.toDataURL('image/png'); link.click(); drawSystem(false);
         };
+
+        function saveConfig() {
+            closeInplaceEditor();
+            const fullConfig = {
+                bgMode: bgMode,
+                customBgColor: customBgColor,
+                fonts: loadedFonts,
+                objects: objects,
+                activeObjId: activeObjId
+            };
+            const blob = new Blob([JSON.stringify(fullConfig, null, 2)], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.download = `deko_config_${Date.now()}.json`;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+        }
+
+        function loadConfig(input) {
+            const file = input.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const cfg = JSON.parse(e.target.result);
+                    if (!cfg.objects) return;
+                    
+                    bgMode = cfg.bgMode || 'check-d';
+                    customBgColor = cfg.customBgColor || '#030305';
+                    document.getElementById('customBgPicker').value = customBgColor;
+
+                    loadedFonts = cfg.fonts || [];
+                    const sel = document.getElementById('fontSelect');
+                    sel.innerHTML = '<option value="sans-serif">System Sans</option><option value="serif">System Serif</option>';
+                    
+                    for(let f of loadedFonts) {
+                        await registerFontData(f.id, f.data, f.name);
+                    }
+
+                    objects = cfg.objects;
+                    activeObjId = cfg.activeObjId || (objects.length > 0 ? objects[0].id : null);
+                    
+                    selectObjectBind();
+                    input.value = '';
+                } catch(err) {
+                    alert("設定ファイルの読み込みに失敗したヨ。");
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file);
+        }
 
         selectObjectBind();
     </script>
