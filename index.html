@@ -32,12 +32,13 @@
 
         #inplaceEditor {
             position: absolute; display: none; background: transparent;
-            color: #fff; border: none; outline: none; margin: 0; padding: 0;
+            color: transparent; border: none; outline: none; margin: 0; padding: 0;
             z-index: 2000; overflow: hidden; font-weight: bold; resize: none;
             line-height: 1.0; white-space: pre; word-wrap: normal;
             caret-color: var(--accent);
-            text-shadow: 0 0 4px rgba(0,0,0,0.8);
         }
+        #inplaceEditor::selection { background: rgba(0, 229, 255, 0.35); color: transparent; }
+        #inplaceEditor::-moz-selection { background: rgba(0, 229, 255, 0.35); color: transparent; }
 
         .control-panel { width: 560px; background-color: var(--bg-panel); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; border: 1px solid #3a3a48; }
         
@@ -67,6 +68,8 @@
 
         .layer-item { background: #2d2d3d; padding: 10px; margin-top: 6px; border-radius: 4px; display: flex; flex-direction: column; gap: 6px; font-size: 0.75rem; border: 1px solid #444; cursor: grab; user-select: none; }
         .layer-item.dragging { opacity: 0.4; border: 1px dashed var(--accent); }
+        .part-fx-item { cursor: grab; }
+        .part-fx-item.dragging { opacity: 0.4; border: 1px dashed var(--accent) !important; }
         .layer-header { display: flex; align-items: center; gap: 8px; width: 100%; font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 4px; }
         
         .btn { background-color: #444; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
@@ -153,40 +156,46 @@
                 <div id="textEditorArea">
                     <div class="row">
                         テキスト内容:<br><textarea id="textStr" oninput="updateActiveObj('text', this.value)"></textarea>
-                        行間隔: <input type="number" id="lineSpacing" value="25" style="width:50px;" oninput="updateActiveObj('lineSpacing', this.value)">
+                        行間隔:
+                        <div class="input-sync" style="width:auto; flex:1;">
+                            <input type="range" id="lineSpacing" min="-50" max="300" value="25" oninput="syncParam('lineSpacing', this.value); updateActiveObj('lineSpacing', this.value)">
+                            <input type="number" id="lineSpacing_num" value="25" style="width:50px;" oninput="syncParam('lineSpacing_num', this.value); updateActiveObj('lineSpacing', this.value)">
+                        </div>
                     </div>
                     <div style="background: rgba(0,229,255,0.08); padding: 8px; border-radius: 4px; margin-top: 5px; border: 1px dashed var(--accent);">
-                        <div class="row" style="font-weight: bold; color: var(--accent);">✨ 部分装飾ターゲット指定</div>
-                        <div class="row">
-                            開始: <input type="number" id="rangeStart" value="-1" min="-1" style="width:45px;" oninput="updateActiveObj('partStart', this.value)">
-                            終了: <input type="number" id="rangeEnd" value="-1" min="-1" style="width:45px;" oninput="updateActiveObj('partEnd', this.value)">
+                        <div class="row" style="font-weight: bold; color: var(--accent); justify-content: space-between;">
+                            <span>✨ 部分装飾パーツ（複数指定可）</span>
                         </div>
-                        <div class="row">
-                            部分色:
-                            <select id="partColorMode" style="font-size:0.75rem;" onchange="updateActiveObj('partMode', this.value)">
-                                <option value="none">指定しない (全共通)</option>
-                                <option value="solid">部分単色カラー</option>
-                            </select>
-                            カラー: <input type="color" id="partSolidColor" value="#ffea00" oninput="updateActiveObj('partColor', this.value)">
+                        <div class="row" style="font-size:0.72rem; color:#ccc; justify-content: space-between;">
+                            <span>選択範囲: <b id="currentSelRangeLabel" style="color:var(--accent);">未選択</b></span>
+                            <button class="btn" onclick="addPartFromSelection()" style="background:#00ffaa; color:#000; font-weight:bold;">+ この範囲で新規パーツ</button>
                         </div>
-                        <div class="row" style="border-top: 1px dashed #555; padding-top: 6px; margin-top: 6px;">
-                            <label><input type="checkbox" id="partSizeEnabled" onchange="togglePartSize(this.checked)"> サイズを個別指定</label>
-                            <input type="number" id="partSizeVal" value="110" min="10" style="width:60px;" oninput="updateActiveObj('partSize', this.value)" disabled>
+                        <div style="font-size:0.68rem; color:#888; margin: 2px 0 6px;">
+                            プレビュー上の文字をダブルクリック→ドラッグで範囲選択→上のボタンで追加。1個目を追加して赤に、2個目を別範囲で追加して青に、のように複数パーツを積み重ねられます。各パーツは色だけでなく「高級フェイスエフェクト」「スタイルスタック効果」も個別に上書きできます。
                         </div>
-                        <div class="row">
-                            <label><input type="checkbox" id="partEdgeEnabled" onchange="togglePartEdge(this.checked)"> 縁取りを個別指定</label>
-                            太さ: <input type="number" id="partEdgeSizeVal" value="10" min="0" style="width:50px;" oninput="updateActiveObj('partEdgeSize', this.value)" disabled>
-                            色: <input type="color" id="partEdgeColorVal" value="#ffffff" oninput="updateActiveObj('partEdgeColor', this.value)" disabled>
-                        </div>
+                        <div id="partLayerContainer"></div>
                     </div>
                 </div>
                 <div class="row" style="margin-top:8px;">
-                    位置 X / Y:
-                    <div>
-                        X: <input type="number" id="objX" value="960" oninput="updateActiveObj('x', this.value)">
-                        Y: <input type="number" id="objY" value="756" oninput="updateActiveObj('y', this.value)">
+                    位置 X:
+                    <div class="input-sync">
+                        <input type="range" id="objX" min="-200" max="2120" value="960" oninput="syncParam('objX', this.value); updateActiveObj('x', this.value)">
+                        <input type="number" id="objX_num" value="960" oninput="syncParam('objX_num', this.value); updateActiveObj('x', this.value)">
                     </div>
-                    回転: <input type="number" id="objRotate" value="0" style="width:55px;" oninput="updateActiveObj('rotate', this.value)">
+                </div>
+                <div class="row">
+                    位置 Y:
+                    <div class="input-sync">
+                        <input type="range" id="objY" min="-200" max="1280" value="756" oninput="syncParam('objY', this.value); updateActiveObj('y', this.value)">
+                        <input type="number" id="objY_num" value="756" oninput="syncParam('objY_num', this.value); updateActiveObj('y', this.value)">
+                    </div>
+                </div>
+                <div class="row">
+                    回転 (度):
+                    <div class="input-sync">
+                        <input type="range" id="objRotate" min="-180" max="180" value="0" oninput="syncParam('objRotate', this.value); updateActiveObj('rotate', this.value)">
+                        <input type="number" id="objRotate_num" value="0" style="width:55px;" oninput="syncParam('objRotate_num', this.value); updateActiveObj('rotate', this.value)">
+                    </div>
                 </div>
                 <div class="row">
                     サイズ:
@@ -209,6 +218,30 @@
                         <input type="number" id="textSkewX_num" value="0" oninput="syncParam('textSkewX_num', this.value); updateActiveObj('skewX', this.value)">
                     </div>
                 </div>
+                <div class="row">
+                    文字間隔 (px):
+                    <div class="input-sync">
+                        <input type="range" id="letterSpacing" min="-50" max="150" value="0" oninput="syncParam('letterSpacing', this.value); updateActiveObj('letterSpacing', this.value)">
+                        <input type="number" id="letterSpacing_num" value="0" oninput="syncParam('letterSpacing_num', this.value); updateActiveObj('letterSpacing', this.value)">
+                    </div>
+                </div>
+                <div style="background: rgba(0,229,255,0.08); padding: 8px; border-radius: 4px; margin-top: 5px; border: 1px dashed var(--accent);">
+                    <div class="row" style="font-weight: bold; color: var(--accent); justify-content: space-between; margin-bottom: 4px;">
+                        <span>🔡 カーニング</span>
+                    </div>
+                    <div class="row">
+                        <label><input type="checkbox" id="autoKerningChk" checked onchange="updateActiveObj('autoKerning', this.checked)"> フォントが持つカーニング情報を使う（自動カーニング）</label>
+                    </div>
+                    <div style="font-size:0.68rem; color:#888; margin: 2px 0 6px;">
+                        プレビュー上のテキストをダブルクリックして編集モードに入り、文字と文字の間にカーソルを置いた状態で
+                        <b>Alt＋←</b>（Macは<b>Option＋←</b>）で詰め、<b>Alt＋→</b>（<b>Option＋→</b>）で広げられます（手動カーニング）。
+                        文字間隔（Tracking）をあとから調整しても、自動・手動のカーニング量はそのまま保持されます。
+                    </div>
+                    <div class="row" style="font-size:0.72rem; color:#ccc; justify-content: space-between;">
+                        <span>カーソル位置の手動カーニング: <b id="kerningInfoLabel" style="color:var(--accent);">未選択</b></span>
+                        <button class="btn" onclick="resetManualKerningAtCursor()" style="background:#553333;">この位置をリセット</button>
+                    </div>
+                </div>
             </div>
 
             <div class="section" style="border-left-color: #e5ff00;">
@@ -218,17 +251,41 @@
                 </div>
                 <div class="row">
                     背景カラー: <input type="color" id="bgColorPicker" value="#000000" oninput="updateBgConfig('color', this.value)">
-                    不透明度 (%): <input type="number" id="bgAlpha" value="80" min="0" max="100" oninput="updateBgConfig('alpha', this.value)">
                 </div>
                 <div class="row">
-                    横マージン幅: <input type="number" id="bgPadX" value="35" oninput="updateBgConfig('padX', this.value)">
-                    縦マージン幅: <input type="number" id="bgPadY" value="15" oninput="updateBgConfig('padY', this.value)">
+                    不透明度 (%):
+                    <div class="input-sync">
+                        <input type="range" id="bgAlpha" min="0" max="100" value="80" oninput="syncParam('bgAlpha', this.value); updateBgConfig('alpha', this.value)">
+                        <input type="number" id="bgAlpha_num" value="80" min="0" max="100" oninput="syncParam('bgAlpha_num', this.value); updateBgConfig('alpha', this.value)">
+                    </div>
                 </div>
                 <div class="row">
-                    位置オフセットY: <input type="number" id="bgOffsetY" value="0" oninput="updateBgConfig('offsetY', this.value)">
+                    横マージン幅:
+                    <div class="input-sync">
+                        <input type="range" id="bgPadX" min="0" max="300" value="35" oninput="syncParam('bgPadX', this.value); updateBgConfig('padX', this.value)">
+                        <input type="number" id="bgPadX_num" value="35" oninput="syncParam('bgPadX_num', this.value); updateBgConfig('padX', this.value)">
+                    </div>
+                </div>
+                <div class="row">
+                    縦マージン幅:
+                    <div class="input-sync">
+                        <input type="range" id="bgPadY" min="0" max="300" value="15" oninput="syncParam('bgPadY', this.value); updateBgConfig('padY', this.value)">
+                        <input type="number" id="bgPadY_num" value="15" oninput="syncParam('bgPadY_num', this.value); updateBgConfig('padY', this.value)">
+                    </div>
+                </div>
+                <div class="row">
+                    位置オフセットY:
+                    <div class="input-sync">
+                        <input type="range" id="bgOffsetY" min="-300" max="300" value="0" oninput="syncParam('bgOffsetY', this.value); updateBgConfig('offsetY', this.value)">
+                        <input type="number" id="bgOffsetY_num" value="0" oninput="syncParam('bgOffsetY_num', this.value); updateBgConfig('offsetY', this.value)">
+                    </div>
                 </div>
                 <div class="row" style="border-top: 1px dashed #555; padding-top: 5px; margin-top: 5px;">
-                    背景アウトライン太さ: <input type="number" id="bgBorderSize" value="0" min="0" oninput="updateBgConfig('borderSize', this.value)">
+                    背景アウトライン太さ:
+                    <div class="input-sync">
+                        <input type="range" id="bgBorderSize" min="0" max="100" value="0" oninput="syncParam('bgBorderSize', this.value); updateBgConfig('borderSize', this.value)">
+                        <input type="number" id="bgBorderSize_num" value="0" min="0" oninput="syncParam('bgBorderSize_num', this.value); updateBgConfig('borderSize', this.value)">
+                    </div>
                     アウトライン色: <input type="color" id="bgBorderColor" value="#ffffff" oninput="updateBgConfig('borderColor', this.value)">
                 </div>
             </div>
@@ -239,14 +296,28 @@
                     <label><input type="checkbox" id="underlineEnabled" onchange="updateUnderlineConfig('enabled', this.checked)"> 下線を表示する</label>
                 </div>
                 <div class="row">
-                    線の太さ: <input type="number" id="underlineThickness" value="8" min="1" oninput="updateUnderlineConfig('thickness', this.value)">
-                    位置(オフセット): <input type="number" id="underlineOffsetY" value="12" oninput="updateUnderlineConfig('offsetY', this.value)">
+                    線の太さ:
+                    <div class="input-sync">
+                        <input type="range" id="underlineThickness" min="1" max="100" value="8" oninput="syncParam('underlineThickness', this.value); updateUnderlineConfig('thickness', this.value)">
+                        <input type="number" id="underlineThickness_num" value="8" min="1" oninput="syncParam('underlineThickness_num', this.value); updateUnderlineConfig('thickness', this.value)">
+                    </div>
+                </div>
+                <div class="row">
+                    位置(オフセット):
+                    <div class="input-sync">
+                        <input type="range" id="underlineOffsetY" min="-100" max="100" value="12" oninput="syncParam('underlineOffsetY', this.value); updateUnderlineConfig('offsetY', this.value)">
+                        <input type="number" id="underlineOffsetY_num" value="12" oninput="syncParam('underlineOffsetY_num', this.value); updateUnderlineConfig('offsetY', this.value)">
+                    </div>
                 </div>
                 <div class="row">
                     線のカラー: <input type="color" id="underlineColor" value="#ffffff" oninput="updateUnderlineConfig('color', this.value)">
                 </div>
                 <div class="row" style="border-top: 1px dashed #555; padding-top: 5px; margin-top: 5px;">
-                    下線フチ太さ: <input type="number" id="underlineBorderSize" value="0" min="0" oninput="updateUnderlineConfig('borderSize', this.value)">
+                    下線フチ太さ:
+                    <div class="input-sync">
+                        <input type="range" id="underlineBorderSize" min="0" max="50" value="0" oninput="syncParam('underlineBorderSize', this.value); updateUnderlineConfig('borderSize', this.value)">
+                        <input type="number" id="underlineBorderSize_num" value="0" min="0" oninput="syncParam('underlineBorderSize_num', this.value); updateUnderlineConfig('borderSize', this.value)">
+                    </div>
                     下線フチ色: <input type="color" id="underlineBorderColor" value="#000000" oninput="updateUnderlineConfig('borderColor', this.value)">
                 </div>
             </div>
@@ -269,7 +340,12 @@
                     <div class="row">カラー指定: <input type="color" id="faceSolidColorPicker" value="#ffffff" oninput="updateActiveObj('faceSolidColor', this.value)"></div>
                 </div>
                 <div id="gradBarSection">
-                    <div class="row">角度 (度): <input type="number" id="gradAngle" value="90" style="width:60px;" oninput="updateActiveObj('gradAngle', this.value)"></div>
+                    <div class="row">角度 (度):
+                        <div class="input-sync">
+                            <input type="range" id="gradAngle" min="0" max="360" value="90" oninput="syncParam('gradAngle', this.value); updateActiveObj('gradAngle', this.value)">
+                            <input type="number" id="gradAngle_num" value="90" style="width:60px;" oninput="syncParam('gradAngle_num', this.value); updateActiveObj('gradAngle', this.value)">
+                        </div>
+                    </div>
                     <div class="grad-bar-wrapper" id="gradBarWrapper">
                         <div class="grad-bar-preview" id="gradBarPreview"></div>
                     </div>
@@ -316,12 +392,12 @@
         let objects = [
             {
                 id: 'track_1', type: 'text', text: "調整用タイムラインが\nここにもついたヨ！",
-                x: 1920/2, y: 1080*0.55, size: 110, scaleX: 100, skewX: 0, rotate: 0, lineSpacing: 25,
+                x: 1920/2, y: 1080*0.55, size: 110, scaleX: 100, skewX: 0, rotate: 0, lineSpacing: 25, letterSpacing: 0,
                 align: 'center', stackMode: 'center', font: 'sans-serif',
                 faceColorMode: 'gradient', faceSolidColor: '#ffffff', gradMapping: 'character', gradAngle: 90,
                 gradMarkers: [{pos:0, color:'#ffffff'}, {pos:100, color:'#00e5ff'}],
-                partStart: -1, partEnd: -1, partMode: 'none', partColor: '#ffea00',
-                partSize: null, partEdgeColor: null, partEdgeSize: null,
+                partLayers: [],
+                autoKerning: true, manualKerning: {},
                 textBg: { enabled: true, color: '#000000', alpha: 75, padX: 35, padY: 15, offsetY: 0, borderSize: 4, borderColor: '#00ffff' },
                 underline: { enabled: false, thickness: 8, offsetY: 12, color: '#ffffff', borderSize: 0, borderColor: '#000000' },
                 fxLayers: [
@@ -333,6 +409,9 @@
         ];
         let activeObjId = 'track_1';
         let selectedMarkerIdx = 0;
+        let currentSelRange = { start: -1, end: -1 };
+        let partGradSelectedIdx = {};
+        let partFxGradSelectedIdx = {};
 
         let isDragging = false;
         let dragTargetObj = null;
@@ -420,8 +499,10 @@
                     const lines = obj.text.split('\n');
                     ctx.save(); ctx.font = `${obj.size}px ${obj.font}`;
                     let maxWidth = 0;
+                    const ls = obj.letterSpacing || 0;
                     lines.forEach(l => {
-                        const w = ctx.measureText(l).width * (obj.scaleX / 100);
+                        const extra = l.length > 1 ? ls * (l.length - 1) : 0;
+                        const w = (ctx.measureText(l).width + extra) * (obj.scaleX / 100);
                         if(w > maxWidth) maxWidth = w;
                     });
                     ctx.restore();
@@ -434,16 +515,26 @@
 
         function updateActiveObj(prop, val) {
             const obj = getActiveObj(); if (!obj) return;
-            if (['size', 'scaleX', 'skewX', 'lineSpacing', 'x', 'y', 'rotate', 'partStart', 'partEnd', 'partSize', 'partEdgeSize'].includes(prop)) val = parseInt(val) || 0;
+            if (['size', 'scaleX', 'skewX', 'lineSpacing', 'letterSpacing', 'x', 'y', 'rotate'].includes(prop)) val = parseInt(val) || 0;
             obj[prop] = val;
-            if (prop === 'x') document.getElementById('objX').value = val;
-            if (prop === 'y') document.getElementById('objY').value = val;
-            if (prop === 'text') document.getElementById('textStr').value = val;
-            if (prop === 'rotate') document.getElementById('objRotate').value = val;
-            if (prop === 'partStart') document.getElementById('rangeStart').value = val;
-            if (prop === 'partEnd') document.getElementById('rangeEnd').value = val;
-            if (prop === 'partMode') document.getElementById('partColorMode').value = val;
-            if (prop === 'partColor') document.getElementById('partSolidColor').value = val;
+            if (prop === 'x') { document.getElementById('objX').value = val; document.getElementById('objX_num').value = val; }
+            if (prop === 'y') { document.getElementById('objY').value = val; document.getElementById('objY_num').value = val; }
+            if (prop === 'text') {
+                document.getElementById('textStr').value = val;
+                // ③ プレビュー上のその場編集（インプレースエディタ）が開いている間にテキストパネル側で
+                // 編集された場合も、双方向に内容が食い違わないよう同期させる。
+                if (inplaceEditor.style.display === 'block' && inplaceEditor.value !== val) {
+                    inplaceEditor.value = val;
+                }
+            }
+            if (prop === 'rotate') { document.getElementById('objRotate').value = val; document.getElementById('objRotate_num').value = val; }
+            if (['size', 'scaleX', 'skewX', 'letterSpacing'].includes(prop) && inplaceEditor.style.display === 'block') {
+                const rect = canvas.getBoundingClientRect();
+                const toCSS = rect.width / canvas.width;
+                inplaceEditor.style.fontSize = `${obj.size * toCSS}px`;
+                inplaceEditor.style.letterSpacing = `${(obj.letterSpacing || 0) * toCSS}px`;
+                inplaceEditor.style.transform = `scaleX(${obj.scaleX / 100}) skewX(${obj.skewX}deg)`;
+            }
             drawSystem();
         }
 
@@ -455,28 +546,363 @@
             document.getElementById('gradMapping').disabled = !isGrad;
         }
 
-        function togglePartSize(checked) {
-            const obj = getActiveObj(); if(!obj) return;
-            const input = document.getElementById('partSizeVal');
-            input.disabled = !checked;
-            obj.partSize = checked ? (obj.partSize || obj.size) : null;
-            if (checked) input.value = obj.partSize;
+        // --- 部分装飾パーツ（複数対応）管理 ---
+        function updateSelRangeLabel() {
+            const label = document.getElementById('currentSelRangeLabel');
+            if (!label) return;
+            label.innerText = (currentSelRange.start === -1) ? '未選択' : `${currentSelRange.start} 〜 ${currentSelRange.end}`;
+        }
+
+        function addPartFromSelection() {
+            const obj = getActiveObj(); if (!obj || obj.type !== 'text') return;
+            if (currentSelRange.start === -1 || currentSelRange.end === -1 || currentSelRange.end < currentSelRange.start) {
+                alert("先にプレビュー上のテキストをダブルクリックして編集モードに入り、装飾したい範囲をドラッグ選択してください。");
+                return;
+            }
+            if (!obj.partLayers) obj.partLayers = [];
+            obj.partLayers.push({
+                id: 'part_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                start: currentSelRange.start, end: currentSelRange.end,
+                faceMode: 'solid', color: '#ffea00',
+                gradMarkers: [{pos:0, color:'#ffffff'}, {pos:100, color:'#ff00aa'}], gradAngle: 90,
+                font: null, size: null, edgeColor: null, edgeSize: null, kerning: null,
+                scaleX: null, skewX: null, offsetX: 0, offsetY: 0, rotate: 0,
+                fxOverride: false, fxLayers: []
+            });
+            renderPartLayerPanel(); drawSystem();
+        }
+
+        function deletePartLayer(idx) {
+            const obj = getActiveObj(); if(!obj || !obj.partLayers) return;
+            obj.partLayers.splice(idx, 1);
+            renderPartLayerPanel(); drawSystem();
+        }
+
+        function movePartLayer(idx, dir) {
+            const obj = getActiveObj(); if(!obj || !obj.partLayers) return;
+            const newIdx = idx + dir;
+            if (newIdx < 0 || newIdx >= obj.partLayers.length) return;
+            const tmp = obj.partLayers[idx];
+            obj.partLayers[idx] = obj.partLayers[newIdx];
+            obj.partLayers[newIdx] = tmp;
+            renderPartLayerPanel(); drawSystem();
+        }
+
+        function updatePartField(idx, prop, val) {
+            const obj = getActiveObj(); if(!obj || !obj.partLayers) return;
+            const pt = obj.partLayers[idx]; if(!pt) return;
+            if (['start', 'end', 'size', 'edgeSize', 'gradAngle', 'kerning', 'scaleX', 'skewX', 'rotate', 'offsetX', 'offsetY'].includes(prop)) val = parseInt(val) || 0;
+            if (prop === 'fxOverride') val = !!val;
+            pt[prop] = val;
+            if (prop === 'faceMode' && val === 'gradient' && !pt.gradMarkers) {
+                pt.gradMarkers = [{pos:0, color:'#ffffff'}, {pos:100, color:'#ff00aa'}];
+            }
+            if (prop === 'fxOverride') {
+                if (val && !pt.fxLayers) pt.fxLayers = [];
+                renderPartLayerPanel();
+            }
             drawSystem();
         }
 
-        function togglePartEdge(checked) {
-            const obj = getActiveObj(); if(!obj) return;
-            const sizeInput = document.getElementById('partEdgeSizeVal');
-            const colorInput = document.getElementById('partEdgeColorVal');
-            sizeInput.disabled = !checked; colorInput.disabled = !checked;
-            if (checked) {
-                obj.partEdgeSize = obj.partEdgeSize ?? 10;
-                obj.partEdgeColor = obj.partEdgeColor || '#ffffff';
-                sizeInput.value = obj.partEdgeSize; colorInput.value = obj.partEdgeColor;
-            } else {
-                obj.partEdgeSize = null; obj.partEdgeColor = null;
+        function togglePartOpt(idx, kind, checked, defaultVal) {
+            const obj = getActiveObj(); if(!obj || !obj.partLayers) return;
+            const pt = obj.partLayers[idx]; if(!pt) return;
+            if (kind === 'font') pt.font = checked ? (pt.font || defaultVal || obj.font) : null;
+            else if (kind === 'size') pt.size = checked ? (pt.size || defaultVal || obj.size) : null;
+            else if (kind === 'edge') {
+                if (checked) { pt.edgeColor = pt.edgeColor || '#ffffff'; pt.edgeSize = pt.edgeSize ?? 10; }
+                else { pt.edgeColor = null; pt.edgeSize = null; }
             }
+            else if (kind === 'kerning') pt.kerning = checked ? (pt.kerning ?? -10) : null;
+            else if (kind === 'scaleX') pt.scaleX = checked ? (pt.scaleX || defaultVal || 100) : null;
+            else if (kind === 'skewX') pt.skewX = checked ? (pt.skewX ?? defaultVal ?? 0) : null;
+            renderPartLayerPanel(); drawSystem();
+        }
+
+        function getFontOptionsHTML(selected) {
+            let html = `<option value="sans-serif" ${selected==='sans-serif'?'selected':''}>System Sans</option><option value="serif" ${selected==='serif'?'selected':''}>System Serif</option>`;
+            loadedFonts.forEach(f => { html += `<option value="${f.id}" ${selected===f.id?'selected':''}>${f.name}</option>`; });
+            return html;
+        }
+
+        function buildPartGradTimeline(idx, containerDiv) {
+            const obj = getActiveObj(); if(!obj) return;
+            const pt = obj.partLayers[idx]; if(!pt || !pt.gradMarkers) return;
+            if (partGradSelectedIdx[idx] === undefined) partGradSelectedIdx[idx] = 0;
+            pt.gradMarkers.sort((a,b) => a.pos - b.pos);
+            const wrapper = containerDiv.querySelector(`#partGradWrap_${idx}`);
+            const preview = containerDiv.querySelector(`#partGradPrev_${idx}`);
+            if (!wrapper || !preview) return;
+            preview.style.background = `linear-gradient(to right, ${pt.gradMarkers.map(m => `${m.color} ${m.pos}%`).join(', ')})`;
+            pt.gradMarkers.forEach((marker, mIdx) => {
+                const pin = document.createElement('div'); pin.className = 'grad-marker'; pin.style.left = `${marker.pos}%`;
+                if (mIdx === partGradSelectedIdx[idx]) pin.style.borderColor = 'var(--accent)';
+                pin.addEventListener('mousedown', (e) => {
+                    e.stopPropagation(); partGradSelectedIdx[idx] = mIdx;
+                    const picker = containerDiv.querySelector(`#partGradPicker_${idx}`);
+                    if (picker) picker.value = marker.color;
+                    function onMove(me) {
+                        const rect = wrapper.getBoundingClientRect();
+                        marker.pos = Math.max(0, Math.min(100, Math.round(((me.clientX - rect.left) / rect.width) * 100)));
+                        pin.style.left = `${marker.pos}%`;
+                        preview.style.background = `linear-gradient(to right, ${pt.gradMarkers.map(m => `${m.color} ${m.pos}%`).join(', ')})`;
+                        drawSystem();
+                    }
+                    function onUp() { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
+                    window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+                });
+                wrapper.appendChild(pin);
+            });
+            wrapper.onclick = (e) => {
+                if (e.target !== wrapper && e.target !== preview) return;
+                const rect = wrapper.getBoundingClientRect();
+                let p = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+                pt.gradMarkers.push({pos: p, color: '#ffffff'});
+                partGradSelectedIdx[idx] = pt.gradMarkers.length - 1;
+                renderPartLayerPanel(); drawSystem();
+            };
+            const picker = containerDiv.querySelector(`#partGradPicker_${idx}`);
+            if (picker) {
+                picker.value = pt.gradMarkers[partGradSelectedIdx[idx]] ? pt.gradMarkers[partGradSelectedIdx[idx]].color : '#ffffff';
+                picker.oninput = (e) => {
+                    if (pt.gradMarkers[partGradSelectedIdx[idx]]) {
+                        pt.gradMarkers[partGradSelectedIdx[idx]].color = e.target.value;
+                        preview.style.background = `linear-gradient(to right, ${pt.gradMarkers.map(m => `${m.color} ${m.pos}%`).join(', ')})`;
+                        drawSystem();
+                    }
+                };
+            }
+        }
+
+        function deletePartGradMarker(idx) {
+            const obj = getActiveObj(); if(!obj) return;
+            const pt = obj.partLayers[idx]; if(!pt || !pt.gradMarkers || pt.gradMarkers.length <= 1) return;
+            pt.gradMarkers.splice(partGradSelectedIdx[idx] || 0, 1);
+            partGradSelectedIdx[idx] = 0;
+            renderPartLayerPanel(); drawSystem();
+        }
+
+        function addPartFxLayer(partIdx, type) {
+            const obj = getActiveObj(); if(!obj) return;
+            const pt = obj.partLayers[partIdx]; if(!pt) return;
+            if (!pt.fxLayers) pt.fxLayers = [];
+            pt.fxOverride = true;
+            if (type === 'edge') pt.fxLayers.unshift({ type:'edge', mode:'solid', color:'#000000', gradAngle:90, gradMarkers:[{pos:0,color:'#fff'},{pos:100,color:'#000'}], size:16 });
+            else pt.fxLayers.unshift({ type:'shadow', mode:'solid', color:'#000000', gradAngle:90, gradMarkers:[{pos:0,color:'#fff'},{pos:100,color:'#000'}], thickness:0, blur:15, ox:12, oy:-12 });
+            renderPartLayerPanel(); drawSystem();
+        }
+
+        function deletePartFxLayer(partIdx, fxIdx) {
+            const obj = getActiveObj(); if(!obj) return;
+            const pt = obj.partLayers[partIdx]; if(!pt) return;
+            pt.fxLayers.splice(fxIdx, 1);
+            renderPartLayerPanel(); drawSystem();
+        }
+
+        function updatePartFxField(partIdx, fxIdx, prop, val) {
+            const obj = getActiveObj(); if(!obj) return;
+            const layer = obj.partLayers[partIdx].fxLayers[fxIdx]; if(!layer) return;
+            if (['size', 'thickness', 'blur', 'ox', 'oy', 'gradAngle'].includes(prop)) val = parseInt(val) || 0;
+            layer[prop] = val;
+            if (prop === 'mode' && val === 'gradient' && !layer.gradMarkers) layer.gradMarkers = [{pos:0,color:'#fff'},{pos:100,color:'#000'}];
+            if (prop === 'mode') renderPartLayerPanel();
             drawSystem();
+        }
+
+        function renderPartFxList(partIdx, containerEl) {
+            if (!containerEl) return;
+            const obj = getActiveObj(); if(!obj) return;
+            const pt = obj.partLayers[partIdx]; if(!pt) return;
+            containerEl.innerHTML = '';
+            (pt.fxLayers || []).forEach((layer, fxIdx) => {
+                const isEdge = layer.type === 'edge';
+                const div = document.createElement('div');
+                div.className = 'part-fx-item';
+                div.draggable = true;
+                div.dataset.index = fxIdx;
+                div.dataset.partIdx = partIdx;
+                div.style.cssText = 'background:#22222e; padding:6px; border-radius:4px; border:1px solid #444; font-size:0.72rem; display:flex; flex-direction:column; gap:4px;';
+                div.innerHTML = `
+                    <div class="layer-header" style="border:none; padding:0; cursor:grab;">
+                        <span style="color:${isEdge?'#00ffaa':'#ffcc00'};">${isEdge?'☰ 外枠フチ':'☰ シャドウ'}</span>
+                        <select style="margin-left:6px;" onchange="updatePartFxField(${partIdx},${fxIdx},'mode',this.value)">
+                            <option value="solid" ${layer.mode==='solid'?'selected':''}>単色</option>
+                            <option value="gradient" ${layer.mode==='gradient'?'selected':''}>グラデーション</option>
+                        </select>
+                        <button class="btn btn-danger" onclick="deletePartFxLayer(${partIdx},${fxIdx})" style="margin-left:auto; padding:2px 5px;">✕</button>
+                    </div>
+                    ${layer.mode === 'solid' ? `<div class="row">カラー:<input type="color" value="${layer.color||'#000000'}" oninput="updatePartFxField(${partIdx},${fxIdx},'color',this.value)"></div>` : `
+                    <div class="row">角度:<div class="input-sync"><input type="range" min="0" max="360" value="${layer.gradAngle||90}" oninput="this.nextElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'gradAngle',this.value)"><input type="number" value="${layer.gradAngle||90}" style="width:50px;" onchange="this.previousElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'gradAngle',this.value)"></div></div>
+                    <div class="grad-bar-wrapper" id="partFxGradWrap_${partIdx}_${fxIdx}"><div class="grad-bar-preview" id="partFxGradPrev_${partIdx}_${fxIdx}"></div></div>
+                    <div class="row">選択点の色:<input type="color" id="partFxGradPicker_${partIdx}_${fxIdx}"><button class="btn btn-danger" onclick="deletePartFxGradMarker(${partIdx},${fxIdx})" style="padding:1px 5px;">点削除</button></div>
+                    `}
+                    ${isEdge ? `
+                    <div class="row">フチ太さ:<div class="input-sync"><input type="range" min="1" max="100" value="${layer.size}" oninput="this.nextElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'size',this.value)"><input type="number" value="${layer.size}" style="width:55px;" onchange="this.previousElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'size',this.value)"></div></div>
+                    ` : `
+                    <div class="row">影の太さ:<div class="input-sync"><input type="range" min="0" max="80" value="${layer.thickness||0}" oninput="this.nextElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'thickness',this.value)"><input type="number" value="${layer.thickness||0}" style="width:55px;" onchange="this.previousElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'thickness',this.value)"></div></div>
+                    <div class="row">影ぼかし:<div class="input-sync"><input type="range" min="0" max="100" value="${layer.blur}" oninput="this.nextElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'blur',this.value)"><input type="number" value="${layer.blur}" style="width:55px;" onchange="this.previousElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'blur',this.value)"></div></div>
+                    <div class="row">位置X:<div class="input-sync"><input type="range" min="-100" max="100" value="${layer.ox}" oninput="this.nextElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'ox',this.value)"><input type="number" value="${layer.ox}" style="width:55px;" onchange="this.previousElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'ox',this.value)"></div></div>
+                    <div class="row">位置Y:<div class="input-sync"><input type="range" min="-100" max="100" value="${layer.oy}" oninput="this.nextElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'oy',this.value)"><input type="number" value="${layer.oy}" style="width:55px;" onchange="this.previousElementSibling.value=this.value; updatePartFxField(${partIdx},${fxIdx},'oy',this.value)"></div></div>
+                    `}
+                `;
+                div.querySelectorAll('input, select, button').forEach(el => {
+                    el.addEventListener('mouseenter', () => { div.draggable = false; });
+                    el.addEventListener('mouseleave', () => { div.draggable = true; });
+                });
+
+                div.addEventListener('dragstart', handleDragStart, false);
+                div.addEventListener('dragover', handleDragOver, false);
+                div.addEventListener('drop', handleDrop, false);
+                div.addEventListener('dragend', handleDragEnd, false);
+
+                containerEl.appendChild(div);
+                if (layer.mode === 'gradient') buildPartFxGradTimeline(partIdx, fxIdx, div);
+            });
+        }
+
+        function buildPartFxGradTimeline(partIdx, fxIdx, containerDiv) {
+            const obj = getActiveObj(); if(!obj) return;
+            const layer = obj.partLayers[partIdx].fxLayers[fxIdx]; if(!layer || !layer.gradMarkers) return;
+            const key = `${partIdx}_${fxIdx}`;
+            if (partFxGradSelectedIdx[key] === undefined) partFxGradSelectedIdx[key] = 0;
+            layer.gradMarkers.sort((a,b) => a.pos - b.pos);
+            const wrapper = containerDiv.querySelector(`#partFxGradWrap_${partIdx}_${fxIdx}`);
+            const preview = containerDiv.querySelector(`#partFxGradPrev_${partIdx}_${fxIdx}`);
+            if (!wrapper || !preview) return;
+            preview.style.background = `linear-gradient(to right, ${layer.gradMarkers.map(m => `${m.color} ${m.pos}%`).join(', ')})`;
+            layer.gradMarkers.forEach((marker, mIdx) => {
+                const pin = document.createElement('div'); pin.className = 'grad-marker'; pin.style.left = `${marker.pos}%`;
+                if (mIdx === partFxGradSelectedIdx[key]) pin.style.borderColor = 'var(--accent)';
+                pin.addEventListener('mousedown', (e) => {
+                    e.stopPropagation(); partFxGradSelectedIdx[key] = mIdx;
+                    const picker = containerDiv.querySelector(`#partFxGradPicker_${partIdx}_${fxIdx}`);
+                    if (picker) picker.value = marker.color;
+                    function onMove(me) {
+                        const rect = wrapper.getBoundingClientRect();
+                        marker.pos = Math.max(0, Math.min(100, Math.round(((me.clientX - rect.left) / rect.width) * 100)));
+                        pin.style.left = `${marker.pos}%`;
+                        preview.style.background = `linear-gradient(to right, ${layer.gradMarkers.map(m => `${m.color} ${m.pos}%`).join(', ')})`;
+                        drawSystem();
+                    }
+                    function onUp() { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
+                    window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+                });
+                wrapper.appendChild(pin);
+            });
+            wrapper.onclick = (e) => {
+                if (e.target !== wrapper && e.target !== preview) return;
+                const rect = wrapper.getBoundingClientRect();
+                let p = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+                layer.gradMarkers.push({pos: p, color: '#ffffff'});
+                partFxGradSelectedIdx[key] = layer.gradMarkers.length - 1;
+                renderPartLayerPanel(); drawSystem();
+            };
+            const picker = containerDiv.querySelector(`#partFxGradPicker_${partIdx}_${fxIdx}`);
+            if (picker) {
+                picker.value = layer.gradMarkers[partFxGradSelectedIdx[key]] ? layer.gradMarkers[partFxGradSelectedIdx[key]].color : '#ffffff';
+                picker.oninput = (e) => {
+                    if (layer.gradMarkers[partFxGradSelectedIdx[key]]) {
+                        layer.gradMarkers[partFxGradSelectedIdx[key]].color = e.target.value;
+                        preview.style.background = `linear-gradient(to right, ${layer.gradMarkers.map(m => `${m.color} ${m.pos}%`).join(', ')})`;
+                        drawSystem();
+                    }
+                };
+            }
+        }
+
+        function deletePartFxGradMarker(partIdx, fxIdx) {
+            const obj = getActiveObj(); if(!obj) return;
+            const layer = obj.partLayers[partIdx].fxLayers[fxIdx]; if(!layer || !layer.gradMarkers || layer.gradMarkers.length <= 1) return;
+            const key = `${partIdx}_${fxIdx}`;
+            layer.gradMarkers.splice(partFxGradSelectedIdx[key] || 0, 1);
+            partFxGradSelectedIdx[key] = 0;
+            renderPartLayerPanel(); drawSystem();
+        }
+
+        function renderPartLayerPanel() {
+            const container = document.getElementById('partLayerContainer');
+            if (!container) return;
+            updateSelRangeLabel();
+            const obj = getActiveObj();
+            container.innerHTML = '';
+            if (!obj || obj.type !== 'text' || !obj.partLayers) return;
+
+            obj.partLayers.forEach((pt, idx) => {
+                const div = document.createElement('div');
+                div.className = 'layer-item'; div.style.cursor = 'default';
+                div.innerHTML = `
+                    <div class="layer-header">
+                        <span style="color:#ffea00;">🎯 パーツ${idx+1}</span>
+                        <span style="font-size:0.7rem; color:#aaa; display:flex; align-items:center; gap:3px;">
+                            開始:<div class="input-sync" style="width:auto;"><input type="range" min="0" max="${Math.max(obj.text.length-1,0)}" value="${pt.start}" oninput="this.nextElementSibling.value=this.value; updatePartField(${idx},'start',this.value)"><input type="number" value="${pt.start}" style="width:42px;" onchange="this.previousElementSibling.value=this.value; updatePartField(${idx},'start',this.value)"></div>
+                            終了:<div class="input-sync" style="width:auto;"><input type="range" min="0" max="${Math.max(obj.text.length-1,0)}" value="${pt.end}" oninput="this.nextElementSibling.value=this.value; updatePartField(${idx},'end',this.value)"><input type="number" value="${pt.end}" style="width:42px;" onchange="this.previousElementSibling.value=this.value; updatePartField(${idx},'end',this.value)"></div>
+                        </span>
+                        <div style="margin-left:auto; display:flex; gap:2px;">
+                            <button class="btn" onclick="movePartLayer(${idx},-1)" style="padding:2px 5px;">↑</button>
+                            <button class="btn" onclick="movePartLayer(${idx},1)" style="padding:2px 5px;">↓</button>
+                            <button class="btn btn-danger" onclick="deletePartLayer(${idx})" style="padding:2px 5px;">✕</button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        高級フェイスエフェクト(塗り):
+                        <select onchange="updatePartField(${idx},'faceMode',this.value); renderPartLayerPanel(); drawSystem();" style="width:110px;">
+                            <option value="none" ${pt.faceMode==='none'?'selected':''}>指定しない</option>
+                            <option value="solid" ${pt.faceMode==='solid'?'selected':''}>単色</option>
+                            <option value="gradient" ${pt.faceMode==='gradient'?'selected':''}>グラデーション</option>
+                        </select>
+                        ${pt.faceMode === 'solid' ? `カラー:<input type="color" value="${pt.color||'#ffea00'}" oninput="updatePartField(${idx},'color',this.value)">` : ''}
+                    </div>
+                    ${pt.faceMode === 'gradient' ? `
+                    <div class="row">角度:<div class="input-sync"><input type="range" min="0" max="360" value="${pt.gradAngle||90}" oninput="this.nextElementSibling.value=this.value; updatePartField(${idx},'gradAngle',this.value)"><input type="number" value="${pt.gradAngle||90}" style="width:50px;" onchange="this.previousElementSibling.value=this.value; updatePartField(${idx},'gradAngle',this.value)"></div></div>
+                    <div class="grad-bar-wrapper" id="partGradWrap_${idx}"><div class="grad-bar-preview" id="partGradPrev_${idx}"></div></div>
+                    <div class="row" style="margin-top:4px;">選択点の色:<input type="color" id="partGradPicker_${idx}"><button class="btn btn-danger" onclick="deletePartGradMarker(${idx})" style="padding:1px 5px;">点削除</button></div>
+                    ` : ''}
+                    <div class="row" style="border-top:1px dashed #555; padding-top:4px; margin-top:4px;">
+                        <label><input type="checkbox" ${pt.font!=null?'checked':''} onchange="togglePartOpt(${idx},'font',this.checked,'${obj.font}')"> フォント個別指定</label>
+                        <select style="width:120px;" ${pt.font==null?'disabled':''} onchange="updatePartField(${idx},'font',this.value)">${getFontOptionsHTML(pt.font||obj.font)}</select>
+                    </div>
+                    <div class="row">
+                        <label><input type="checkbox" ${pt.size!=null?'checked':''} onchange="togglePartOpt(${idx},'size',this.checked,${obj.size})"> サイズ個別指定</label>
+                        <div class="input-sync"><input type="range" min="10" max="300" value="${pt.size ?? obj.size}" ${pt.size==null?'disabled':''} oninput="this.nextElementSibling.value=this.value; updatePartField(${idx},'size',this.value)"><input type="number" value="${pt.size ?? obj.size}" style="width:60px;" ${pt.size==null?'disabled':''} onchange="this.previousElementSibling.value=this.value; updatePartField(${idx},'size',this.value)"></div>
+                    </div>
+                    <div class="row">
+                        <label><input type="checkbox" ${pt.edgeColor!=null?'checked':''} onchange="togglePartOpt(${idx},'edge',this.checked)"> 縁取り個別指定</label>
+                        太さ:<div class="input-sync"><input type="range" min="1" max="100" value="${pt.edgeSize ?? 10}" ${pt.edgeColor==null?'disabled':''} oninput="this.nextElementSibling.value=this.value; updatePartField(${idx},'edgeSize',this.value)"><input type="number" value="${pt.edgeSize ?? 10}" style="width:45px;" ${pt.edgeColor==null?'disabled':''} onchange="this.previousElementSibling.value=this.value; updatePartField(${idx},'edgeSize',this.value)"></div>
+                        色:<input type="color" value="${pt.edgeColor || '#ffffff'}" ${pt.edgeColor==null?'disabled':''} oninput="updatePartField(${idx},'edgeColor',this.value)">
+                    </div>
+                    <div class="row">
+                        <label><input type="checkbox" ${pt.kerning!=null?'checked':''} onchange="togglePartOpt(${idx},'kerning',this.checked)"> 文字間個別指定</label>
+                        <div class="input-sync"><input type="range" min="-50" max="150" value="${pt.kerning ?? -10}" ${pt.kerning==null?'disabled':''} oninput="this.nextElementSibling.value=this.value; updatePartField(${idx},'kerning',this.value)"><input type="number" value="${pt.kerning ?? -10}" style="width:55px;" ${pt.kerning==null?'disabled':''} onchange="this.previousElementSibling.value=this.value; updatePartField(${idx},'kerning',this.value)"></div>
+                    </div>
+                    <div class="row" style="border-top:1px dashed #555; padding-top:4px; margin-top:4px;">
+                        <label><input type="checkbox" ${pt.scaleX!=null?'checked':''} onchange="togglePartOpt(${idx},'scaleX',this.checked,${obj.scaleX})"> 長体個別指定</label>
+                        <div class="input-sync"><input type="range" min="30" max="200" value="${pt.scaleX ?? obj.scaleX}" ${pt.scaleX==null?'disabled':''} oninput="this.nextElementSibling.value=this.value; updatePartField(${idx},'scaleX',this.value)"><input type="number" value="${pt.scaleX ?? obj.scaleX}" style="width:55px;" ${pt.scaleX==null?'disabled':''} onchange="this.previousElementSibling.value=this.value; updatePartField(${idx},'scaleX',this.value)"></div>
+                    </div>
+                    <div class="row">
+                        <label><input type="checkbox" ${pt.skewX!=null?'checked':''} onchange="togglePartOpt(${idx},'skewX',this.checked,0)"> 斜体個別指定</label>
+                        <div class="input-sync"><input type="range" min="-60" max="60" value="${pt.skewX ?? 0}" ${pt.skewX==null?'disabled':''} oninput="this.nextElementSibling.value=this.value; updatePartField(${idx},'skewX',this.value)"><input type="number" value="${pt.skewX ?? 0}" style="width:50px;" ${pt.skewX==null?'disabled':''} onchange="this.previousElementSibling.value=this.value; updatePartField(${idx},'skewX',this.value)"></div>
+                    </div>
+                    <div class="row">
+                        座標X:<div class="input-sync" style="width:32%;"><input type="range" min="-300" max="300" value="${pt.offsetX ?? 0}" oninput="this.nextElementSibling.value=this.value; updatePartField(${idx},'offsetX',this.value)"><input type="number" value="${pt.offsetX ?? 0}" style="width:50px;" onchange="this.previousElementSibling.value=this.value; updatePartField(${idx},'offsetX',this.value)"></div>
+                        Y:<div class="input-sync" style="width:32%;"><input type="range" min="-300" max="300" value="${pt.offsetY ?? 0}" oninput="this.nextElementSibling.value=this.value; updatePartField(${idx},'offsetY',this.value)"><input type="number" value="${pt.offsetY ?? 0}" style="width:50px;" onchange="this.previousElementSibling.value=this.value; updatePartField(${idx},'offsetY',this.value)"></div>
+                    </div>
+                    <div class="row">
+                        回転:<div class="input-sync"><input type="range" min="-180" max="180" value="${pt.rotate ?? 0}" oninput="this.nextElementSibling.value=this.value; updatePartField(${idx},'rotate',this.value)"><input type="number" value="${pt.rotate ?? 0}" style="width:50px;" onchange="this.previousElementSibling.value=this.value; updatePartField(${idx},'rotate',this.value)"></div>
+                    </div>
+                    <div class="row" style="border-top:1px dashed #555; padding-top:4px; margin-top:4px; justify-content: space-between;">
+                        <label><input type="checkbox" ${pt.fxOverride?'checked':''} onchange="updatePartField(${idx},'fxOverride',this.checked)"> スタイルスタック効果を個別指定</label>
+                        <div style="display:flex; gap:3px;">
+                            <button class="btn" onclick="addPartFxLayer(${idx},'edge')" style="background:#00ffaa; color:#000; padding:2px 5px; font-size:0.68rem;">+フチ</button>
+                            <button class="btn" onclick="addPartFxLayer(${idx},'shadow')" style="background:#ffcc00; color:#000; padding:2px 5px; font-size:0.68rem;">+影</button>
+                        </div>
+                    </div>
+                    <div id="partFxContainer_${idx}" style="display:${pt.fxOverride?'flex':'none'}; flex-direction:column; gap:4px;"></div>
+                `;
+                container.appendChild(div);
+
+                if (pt.faceMode === 'gradient') buildPartGradTimeline(idx, div);
+                if (pt.fxOverride) renderPartFxList(idx, div.querySelector(`#partFxContainer_${idx}`));
+            });
         }
 
         function updateTrackSelector() {
@@ -494,48 +920,49 @@
             const obj = getActiveObj();
             updateTrackSelector();
             
+            currentSelRange = { start: -1, end: -1 };
+
             if(!obj) {
                 document.getElementById('textEditorArea').style.display = 'none';
-                renderLayerPanel(); drawSystem(); return;
+                renderLayerPanel(); renderPartLayerPanel(); drawSystem(); return;
             }
             
             document.getElementById('textEditorArea').style.display = obj.type === 'text' ? 'block' : 'none';
             if (obj.type === 'text') {
+                if (!obj.partLayers) obj.partLayers = [];
                 document.getElementById('textStr').value = obj.text;
                 document.getElementById('lineSpacing').value = obj.lineSpacing;
+                document.getElementById('lineSpacing_num').value = obj.lineSpacing;
                 document.getElementById('fontSelect').value = obj.font || 'sans-serif';
-                
-                document.getElementById('rangeStart').value = obj.partStart ?? -1;
-                document.getElementById('rangeEnd').value = obj.partEnd ?? -1;
-                document.getElementById('partColorMode').value = obj.partMode || 'none';
-                document.getElementById('partSolidColor').value = obj.partColor || '#ffea00';
 
-                document.getElementById('partSizeEnabled').checked = obj.partSize != null;
-                document.getElementById('partSizeVal').value = obj.partSize ?? obj.size;
-                document.getElementById('partSizeVal').disabled = obj.partSize == null;
-
-                document.getElementById('partEdgeEnabled').checked = obj.partEdgeColor != null;
-                document.getElementById('partEdgeSizeVal').value = obj.partEdgeSize ?? 10;
-                document.getElementById('partEdgeColorVal').value = obj.partEdgeColor ?? '#ffffff';
-                document.getElementById('partEdgeSizeVal').disabled = obj.partEdgeColor == null;
-                document.getElementById('partEdgeColorVal').disabled = obj.partEdgeColor == null;
+                if (!obj.manualKerning) obj.manualKerning = {};
+                document.getElementById('autoKerningChk').checked = obj.autoKerning !== false;
+                updateKerningReadout();
 
                 if(!obj.textBg) obj.textBg = { enabled: false, color: '#000000', alpha: 80, padX: 35, padY: 15, offsetY: 0, borderSize:0, borderColor:'#ffffff' };
                 document.getElementById('bgEnabled').checked = obj.textBg.enabled;
                 document.getElementById('bgColorPicker').value = obj.textBg.color || '#000000';
                 document.getElementById('bgAlpha').value = obj.textBg.alpha ?? 80;
+                document.getElementById('bgAlpha_num').value = obj.textBg.alpha ?? 80;
                 document.getElementById('bgPadX').value = obj.textBg.padX ?? 35;
+                document.getElementById('bgPadX_num').value = obj.textBg.padX ?? 35;
                 document.getElementById('bgPadY').value = obj.textBg.padY ?? 15;
+                document.getElementById('bgPadY_num').value = obj.textBg.padY ?? 15;
                 document.getElementById('bgOffsetY').value = obj.textBg.offsetY ?? 0;
+                document.getElementById('bgOffsetY_num').value = obj.textBg.offsetY ?? 0;
                 document.getElementById('bgBorderSize').value = obj.textBg.borderSize ?? 0;
+                document.getElementById('bgBorderSize_num').value = obj.textBg.borderSize ?? 0;
                 document.getElementById('bgBorderColor').value = obj.textBg.borderColor || '#ffffff';
 
                 if(!obj.underline) obj.underline = { enabled: false, thickness: 8, offsetY: 12, color: '#ffffff', borderSize: 0, borderColor: '#000000' };
                 document.getElementById('underlineEnabled').checked = obj.underline.enabled;
                 document.getElementById('underlineThickness').value = obj.underline.thickness ?? 8;
+                document.getElementById('underlineThickness_num').value = obj.underline.thickness ?? 8;
                 document.getElementById('underlineOffsetY').value = obj.underline.offsetY ?? 12;
+                document.getElementById('underlineOffsetY_num').value = obj.underline.offsetY ?? 12;
                 document.getElementById('underlineColor').value = obj.underline.color || '#ffffff';
                 document.getElementById('underlineBorderSize').value = obj.underline.borderSize ?? 0;
+                document.getElementById('underlineBorderSize_num').value = obj.underline.borderSize ?? 0;
                 document.getElementById('underlineBorderColor').value = obj.underline.borderColor || '#000000';
             }
             
@@ -545,30 +972,35 @@
             document.getElementById('textScaleX_num').value = obj.scaleX;
             document.getElementById('textSkewX').value = obj.skewX;
             document.getElementById('textSkewX_num').value = obj.skewX;
+            document.getElementById('letterSpacing').value = obj.letterSpacing || 0;
+            document.getElementById('letterSpacing_num').value = obj.letterSpacing || 0;
             document.getElementById('faceColorMode').value = obj.faceColorMode;
             document.getElementById('faceSolidColorPicker').value = obj.faceSolidColor || '#ffffff';
             document.getElementById('gradMapping').value = obj.gradMapping;
 
             document.getElementById('objX').value = obj.x;
+            document.getElementById('objX_num').value = obj.x;
             document.getElementById('objY').value = obj.y;
+            document.getElementById('objY_num').value = obj.y;
             document.getElementById('objRotate').value = obj.rotate;
+            document.getElementById('objRotate_num').value = obj.rotate;
 
             ['alignLeftBtn', 'alignCenterBtn', 'alignRightBtn'].forEach(id => document.getElementById(id).classList.remove('btn-active'));
             if(obj.align) document.getElementById(`align${obj.align.charAt(0).toUpperCase() + obj.align.slice(1)}Btn`).classList.add('btn-active');
 
-            toggleFaceUI(); renderGradTimeline(); renderLayerPanel(); drawSystem();
+            toggleFaceUI(); renderGradTimeline(); renderLayerPanel(); renderPartLayerPanel(); drawSystem();
         }
 
         function addNewText() {
             const id = 'track_' + Date.now();
             objects.push({
                 id: id, type: 'text', text: "新規タイトル",
-                x: 1920/2, y: 1080/2, size: 110, scaleX: 100, skewX: 0, rotate: 0, lineSpacing: 15,
+                x: 1920/2, y: 1080/2, size: 110, scaleX: 100, skewX: 0, rotate: 0, lineSpacing: 15, letterSpacing: 0,
                 align: 'center', stackMode: 'center', font: document.getElementById('fontSelect').value || 'sans-serif',
                 faceColorMode: 'solid', faceSolidColor: '#ffffff', gradMapping: 'total', gradAngle: 90,
                 gradMarkers: [{pos:0, color:'#00ffff'}, {pos:100, color:'#0055ff'}],
-                partStart: -1, partEnd: -1, partMode: 'none', partColor: '#ffea00',
-                partSize: null, partEdgeColor: null, partEdgeSize: null,
+                partLayers: [],
+                autoKerning: true, manualKerning: {},
                 textBg: { enabled: false, color: '#000000', alpha: 80, padX: 35, padY: 15, offsetY: 0, borderSize: 0, borderColor: '#ffffff' },
                 underline: { enabled: false, thickness: 8, offsetY: 12, color: '#ffffff', borderSize: 0, borderColor: '#000000' },
                 fxLayers: [{ type: 'edge', mode: 'solid', color: '#000000', size: 15 }]
@@ -619,6 +1051,7 @@
                 if(!loadedFonts.some(f => f.id === fontId)) {
                     loadedFonts.push({ id: fontId, name: displayName, data: dataUrl });
                 }
+                renderPartLayerPanel(); // 追加フォントをパーツ個別フォント選択にも反映
             } catch(err) {
                 console.error("Font load failed:", err);
             }
@@ -687,11 +1120,18 @@
                     me.stopPropagation(); layerSelectedMarkerIdx[index] = mIdx;
                     const cp = parentDiv.querySelector(`.layer-picker-${index}`);
                     if(cp) cp.value = marker.color;
-                    renderLayerPanel();
+                    // 注意: ここで renderLayerPanel() を呼ぶとパネルのDOMが丸ごと再構築され、
+                    // このグラデーションバー(wrapper/preview)も新しい要素に差し替わってしまう。
+                    // その結果、以下のドラッグ処理(onPinMove)が古い(DOMから外れた)要素を
+                    // 参照し続けてしまい、マーカーの位置が動かせなくなるバグの原因だった。
+                    // そのため全体再描画はせず、選択中マーカーの枠色だけを直接更新する。
+                    wrapper.querySelectorAll('.grad-marker').forEach(p => { p.style.borderColor = '#000'; });
+                    pin.style.borderColor = 'var(--accent)';
                     
                     function onPinMove(mme) {
                         const rect = wrapper.getBoundingClientRect();
                         marker.pos = Math.max(0, Math.min(100, Math.round(((mme.clientX - rect.left) / rect.width) * 100)));
+                        pin.style.left = `${marker.pos}%`;
                         preview.style.background = `linear-gradient(to right, ${layer.gradMarkers.map(m => `${m.color} ${m.pos}%`).join(', ')})`;
                         drawSystem();
                     }
@@ -732,7 +1172,7 @@
                         <button class="btn btn-danger" onclick="deleteFXLayer(${index})" style="margin-left:auto; padding:2px 5px;">✕</button>
                     </div>
                     <div class="row style-color-row" id="colorRow_${index}">
-                        角度:<input type="number" class="fx-input-angle ignore-drag" data-prop="gradAngle" data-idx="${index}" value="${layer.gradAngle||90}" style="width:40px;">
+                        角度:<div class="input-sync" style="width:auto;"><input type="range" class="fx-slider ignore-drag" data-prop="gradAngle" data-idx="${index}" min="0" max="360" value="${layer.gradAngle||90}"><input type="number" class="fx-input-num ignore-drag" data-prop="gradAngle" data-idx="${index}" value="${layer.gradAngle||90}" style="width:40px;"></div>
                         ${layer.mode === 'gradient' ? `
                             選択点の色:<input type="color" class="layer-picker-${index} ignore-drag" value="${layer.gradMarkers && layer.gradMarkers[layerSelectedMarkerIdx[index]] ? layer.gradMarkers[layerSelectedMarkerIdx[index]].color : '#ffffff'}">
                             <button class="btn btn-danger" onclick="deleteLayerMarker(${index})" style="padding:1px 4px; font-size:0.65rem;">点削除</button>
@@ -752,6 +1192,7 @@
                         </div>`;
                 } else {
                     controlsHTML += `
+                        <div class="row">影の太さ:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="thickness" data-idx="${index}" min="0" max="80" value="${layer.thickness || 0}"><input type="number" class="fx-input-num ignore-drag" data-prop="thickness" data-idx="${index}" value="${layer.thickness || 0}"></div></div>
                         <div class="row">影ぼかし:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="blur" data-idx="${index}" min="0" max="100" value="${layer.blur}"><input type="number" class="fx-input-num ignore-drag" data-prop="blur" data-idx="${index}" value="${layer.blur}"></div></div>
                         <div class="row">位置 X:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="ox" data-idx="${index}" min="-100" max="100" value="${layer.ox}"><input type="number" class="fx-input-num ignore-drag" data-prop="ox" data-idx="${index}" value="${layer.ox}"></div></div>
                         <div class="row">位置 Y:<div class="input-sync"><input type="range" class="fx-slider ignore-drag" data-prop="oy" data-idx="${index}" min="-100" max="100" value="${layer.oy}"><input type="number" class="fx-input-num ignore-drag" data-prop="oy" data-idx="${index}" value="${layer.oy}"></div></div>
@@ -844,11 +1285,26 @@
             if (e.stopPropagation) e.stopPropagation();
             if (dragSrcEl !== this) {
                 const obj = getActiveObj(); if(!obj) return false;
-                const srcIdx = parseInt(dragSrcEl.dataset.index);
-                const targetIdx = parseInt(this.dataset.index);
-                const rem = obj.fxLayers.splice(srcIdx, 1)[0];
-                obj.fxLayers.splice(targetIdx, 0, rem);
-                renderLayerPanel(); drawSystem();
+                const srcPartIdx = dragSrcEl.dataset.partIdx;
+                const targetPartIdx = this.dataset.partIdx;
+
+                if (srcPartIdx !== undefined && targetPartIdx !== undefined && srcPartIdx === targetPartIdx) {
+                    // パーツ個別指定(スタイルスタック効果を個別指定)のFXレイヤー並べ替え
+                    const pt = obj.partLayers && obj.partLayers[parseInt(srcPartIdx)];
+                    if (!pt || !pt.fxLayers) return false;
+                    const srcIdx = parseInt(dragSrcEl.dataset.index);
+                    const targetIdx = parseInt(this.dataset.index);
+                    const rem = pt.fxLayers.splice(srcIdx, 1)[0];
+                    pt.fxLayers.splice(targetIdx, 0, rem);
+                    renderPartLayerPanel(); drawSystem();
+                } else if (srcPartIdx === undefined && targetPartIdx === undefined) {
+                    // 総則スタイルレイヤー(全体共通FXレイヤー)の並べ替え
+                    const srcIdx = parseInt(dragSrcEl.dataset.index);
+                    const targetIdx = parseInt(this.dataset.index);
+                    const rem = obj.fxLayers.splice(srcIdx, 1)[0];
+                    obj.fxLayers.splice(targetIdx, 0, rem);
+                    renderLayerPanel(); drawSystem();
+                }
             }
             return false;
         }
@@ -897,23 +1353,71 @@
                 let lineData = [];
                 let maxLineWidth = 0;
                 let absoluteCharIdx = 0;
+                const letterSp = obj.letterSpacing || 0;
 
-                const rStart = obj.partStart ?? -1;
-                const rEnd = obj.partEnd ?? -1;
-                const pMode = obj.partMode || 'none';
-                const pColor = obj.partColor || '#ffea00';
+                const parts = obj.partLayers || [];
+
+                // ④ フォントが持つペアカーニング情報を「1文字ずつ測った幅の合計」と「2文字まとめて測った幅」の
+                // 差分として明示的に取り出す。1文字ずつ描画するこのツールの仕組み上、これをやらないと
+                // フォント本来のペアカーニングが一切反映されないため。
+                function getAutoKerningDelta(charA, charB, size, font) {
+                    ctx.save();
+                    ctx.font = `${size}px ${font}`;
+                    const wA = ctx.measureText(charA).width;
+                    const wB = ctx.measureText(charB).width;
+                    const wAB = ctx.measureText(charA + charB).width;
+                    ctx.restore();
+                    return wAB - wA - wB;
+                }
 
                 lines.forEach((lineText) => {
                     let lineAdvance = 0;
                     let chars = lineText.split('').map(char => {
                         let currentIdx = absoluteCharIdx++;
-                        let isTarget = (rStart !== -1 && rEnd !== -1 && currentIdx >= rStart && currentIdx <= rEnd);
-                        const charSize = (isTarget && obj.partSize) ? obj.partSize : fSize;
-                        if (charSize !== fSize) ctx.font = `${charSize}px ${obj.font}`;
+                        // 複数パーツに範囲がまたがる場合は配列の後ろ（＝リストの下）にあるパーツが優先される
+                        let matchedPart = null;
+                        for (let p = 0; p < parts.length; p++) {
+                            const pt = parts[p];
+                            if (pt.start != null && pt.end != null && pt.start <= pt.end && currentIdx >= pt.start && currentIdx <= pt.end) matchedPart = pt;
+                        }
+                        const isTarget = !!matchedPart;
+                        const charSize = (isTarget && matchedPart.size) ? matchedPart.size : fSize;
+                        const charFont = (isTarget && matchedPart.font) ? matchedPart.font : obj.font;
+                        const fontChanged = (charSize !== fSize || charFont !== obj.font);
+                        if (fontChanged) ctx.font = `${charSize}px ${charFont}`;
                         const m = ctx.measureText(char);
-                        if (charSize !== fSize) ctx.font = `${fSize}px ${obj.font}`;
-                        lineAdvance += m.width;
-                        return { char, advanceWidth: m.width, isTarget, size: charSize };
+                        if (fontChanged) ctx.font = `${fSize}px ${obj.font}`;
+                        // 実際のグリフのインク境界（上下）を取得。"." のように背が低い文字でも
+                        // グラデーションの参照範囲が行の高さ全体になってしまわないようにするため。
+                        let inkAscent = m.actualBoundingBoxAscent;
+                        let inkDescent = m.actualBoundingBoxDescent;
+                        if (!isFinite(inkAscent) || !isFinite(inkDescent) || (inkAscent === 0 && inkDescent === 0)) {
+                            // 未対応ブラウザや空白文字の場合のフォールバック
+                            inkAscent = charSize * 0.8;
+                            inkDescent = charSize * 0.2;
+                        }
+                        return { char, advanceWidth: m.width, isTarget, size: charSize, font: charFont, part: matchedPart, inkAscent, inkDescent, idx: currentIdx };
+                    });
+                    chars.forEach((c, i) => {
+                        lineAdvance += c.advanceWidth;
+                        if (i < chars.length - 1) {
+                            // (a) パーツごとのトラッキング上書き、なければ全体の文字間隔（Tracking）が基準値
+                            let gap = (c.part && c.part.kerning != null) ? c.part.kerning : letterSp;
+                            // (b) フォントの自動カーニング情報（ON/OFFはユーザーが選択可能）。トラッキングとは
+                            // 別に加算するので、あとでトラッキングだけを調整してもこの値は保持される。
+                            if (obj.autoKerning !== false) {
+                                gap += getAutoKerningDelta(c.char, chars[i + 1].char, c.size, c.font);
+                            }
+                            // (c) プレビュー上でAlt(Option)＋←/→により個別調整した手動カーニング。
+                            // こちらも同様にトラッキングへ上乗せする形で加算し、情報として保持する。
+                            if (obj.manualKerning && obj.manualKerning[c.idx] != null) {
+                                gap += obj.manualKerning[c.idx];
+                            }
+                            c.gap = gap;
+                            lineAdvance += gap;
+                        } else {
+                            c.gap = 0;
+                        }
                     });
                     absoluteCharIdx++; 
                     if(lineAdvance * scaleX > maxLineWidth) maxLineWidth = lineAdvance * scaleX;
@@ -992,100 +1496,172 @@
                     ctx.restore();
                 }
 
-                function getAdvancedStyle(layerOrObj, bounds) {
+                function getAdvancedStyle(layerOrObj, bounds, ctxRef) {
+                    ctxRef = ctxRef || ctx;
                     let markers = layerOrObj.gradMarkers || layerOrObj.markers;
                     if (!markers) return layerOrObj.color || '#000';
                     const angleRad = ((layerOrObj.gradAngle || 90) * Math.PI) / 180;
                     const cx = (bounds.left + bounds.right) / 2; const cy = (bounds.top + bounds.bottom) / 2;
                     const w = bounds.right - bounds.left; const h = bounds.bottom - bounds.top;
-                    const r = Math.sqrt(w * w + h * h) / 2;
-                    const grad = ctx.createLinearGradient(cx - r * Math.cos(angleRad), cy - r * Math.sin(angleRad), cx + r * Math.cos(angleRad), cy + r * Math.sin(angleRad));
+                    const r = Math.max(Math.sqrt(w * w + h * h) / 2, 0.5); // 幅・高さが0に近いとグラデーションが単色化するため下限を設ける
+                    const grad = ctxRef.createLinearGradient(cx - r * Math.cos(angleRad), cy - r * Math.sin(angleRad), cx + r * Math.cos(angleRad), cy + r * Math.sin(angleRad));
                     markers.forEach(m => grad.addColorStop(m.pos / 100, m.color));
                     return grad;
                 }
 
-                function executeRenderPass(mode, layer = null) {
+                function executeRenderPass(mode, layer = null, filterFn = null) {
+                    // シャドウは文字を1つずつ個別にぼかすのではなく、対象の文字群をまず
+                    // オフスクリーンのバッファへひとまとまりに描画し、最後にバッファ全体へ
+                    // 一括でぼかしフィルタをかけてから本体キャンバスへ合成する。
+                    // こうすることで、文字ごとに輪郭がにじむのではなく「シャドウ全体」が
+                    // ひとつの塊としてなめらかにぼやけるようになる。
+                    let shadowBuffer = null, sctx = null;
+                    if (mode === 'shadow') {
+                        shadowBuffer = document.createElement('canvas');
+                        shadowBuffer.width = canvas.width;
+                        shadowBuffer.height = canvas.height;
+                        sctx = shadowBuffer.getContext('2d');
+                    }
+                    const dctx = (mode === 'shadow') ? sctx : ctx;
+
                     let currentLineY = obj.y + startOffsetY;
                     lineData.forEach(ld => {
                         let lineStartX = obj.align === 'center' ? obj.x - (ld.totalWidth * scaleX)/2 : (obj.align === 'right' ? obj.x - ld.totalWidth * scaleX : obj.x);
                         let trackingX = lineStartX;
 
                         ld.chars.forEach(cm => {
-                            ctx.save(); 
-                            ctx.translate(obj.x, obj.y); ctx.rotate((obj.rotate * Math.PI) / 180); ctx.translate(-obj.x, -obj.y);
+                            const pt = cm.part;
+                            // ✨ 部分装飾パーツごとの個別設定（長体・斜体・座標・回転）。
+                            // 未指定（null/0）の場合はオブジェクト全体の値を継承する。
+                            const partScaleX = (pt && pt.scaleX != null) ? pt.scaleX / 100 : scaleX;
+                            const partSkewRad = (pt && pt.skewX != null) ? (pt.skewX * Math.PI) / 180 : skewX;
+                            const partRotateDeg = (pt && pt.rotate) ? pt.rotate : 0;
+                            const partOffX = (pt && pt.offsetX) ? pt.offsetX : 0;
+                            const partOffY = (pt && pt.offsetY) ? pt.offsetY : 0;
+
+                            dctx.save();
+                            dctx.translate(obj.x, obj.y); dctx.rotate((obj.rotate * Math.PI) / 180); dctx.translate(-obj.x, -obj.y);
                             
                             const charCenterX = trackingX + (cm.advanceWidth * scaleX) / 2;
-                            ctx.translate(charCenterX, currentLineY);
-                            ctx.transform(1, 0, Math.tan(skewX), 1, 0, 0);
-                            ctx.font = `${cm.size}px ${obj.font}`;
+                            dctx.translate(charCenterX, currentLineY);
+                            if (partOffX || partOffY) dctx.translate(partOffX, partOffY);
+                            if (partRotateDeg) dctx.rotate((partRotateDeg * Math.PI) / 180);
+                            dctx.transform(1, 0, Math.tan(partSkewRad), 1, 0, 0);
+                            // ① ②「長体/平体」は fillText/strokeText の maxWidth 引数（自動縮小のみでしか働かず、
+                            // 101%以上の平体では文字が広がらず間隔だけがズレる）には頼らず、横方向のみの
+                            // 明示的なスケール変換で適用する。こうすることで100%超（平体）でも正しく文字が
+                            // 広がり、縁取り（ストローク）も含めて常に同じ計算式で一貫してスケールされる。
+                            dctx.scale(partScaleX, 1);
+                            dctx.font = `${cm.size}px ${cm.font}`;
 
-                            const targetWidth = cm.advanceWidth * scaleX;
-                            const cBounds = { left: -targetWidth/2, right: targetWidth/2, top: -fSize, bottom: fSize*0.2 };
+                            const targetWidth = cm.advanceWidth; // ここは dctx.scale 適用後のローカル座標なので実寸のまま
+                            // グラデーションの上下範囲は、文字ごとの実際のインク高さを使う。
+                            // 固定の行高さ（-fSize 〜 fSize*0.2）のままだと、"." のように
+                            // 背が低い文字は実際のインクがグラデーション帯のごく一部（下端付近）
+                            // にしか重ならず、結果として片方の色（例：黒）しか見えなくなる。
+                            const inkTop = -(cm.inkAscent != null ? cm.inkAscent : fSize * 0.8);
+                            const inkBottom = (cm.inkDescent != null ? cm.inkDescent : fSize * 0.2);
+                            const cBounds = { left: -targetWidth/2, right: targetWidth/2, top: inkTop, bottom: inkBottom };
+                            // 行全体グラデーション用の範囲も、上の dctx.scale 分をあらかじめ割り戻しておくことで
+                            // スケール変換後の見た目の位置が元と一致するようにする。
+                            const totalBoundsX = (ld.totalWidth * scaleX) / 2 / partScaleX;
 
+                            // パーツ個別の「高級フェイスエフェクト（塗り）」上書き
                             let overridenFill = null;
-                            if (cm.isTarget && pMode !== 'none') {
-                                if (pMode === 'solid') overridenFill = pColor;
-                                else if (pMode === 'gradient') {
-                                    const tBounds = obj.gradMapping === 'character' ? cBounds : { left: -(ld.totalWidth*scaleX)/2, right: (ld.totalWidth*scaleX)/2, top: -fSize, bottom: 0 };
-                                    overridenFill = getAdvancedStyle(obj, tBounds);
+                            if (cm.part && cm.part.faceMode && cm.part.faceMode !== 'none') {
+                                if (cm.part.faceMode === 'solid') overridenFill = cm.part.color || '#ffea00';
+                                else if (cm.part.faceMode === 'gradient') {
+                                    const tBounds = obj.gradMapping === 'character' ? cBounds : { left: -totalBoundsX, right: totalBoundsX, top: -fSize, bottom: 0 };
+                                    const partGradSrc = { gradMarkers: cm.part.gradMarkers || obj.gradMarkers, gradAngle: cm.part.gradAngle ?? obj.gradAngle };
+                                    overridenFill = getAdvancedStyle(partGradSrc, tBounds, dctx);
                                 }
                             }
 
-                            ctx.lineJoin = 'round'; 
+                            dctx.lineJoin = 'round';
+                            const shouldDraw = !filterFn || filterFn(cm);
 
-                            if (mode === 'shadow') {
-                                ctx.save();
-                                let style = layer.mode === 'gradient' ? getAdvancedStyle(layer, cBounds) : layer.color;
-                                if (layer.blur > 0) {
-                                    ctx.shadowColor = (layer.mode === 'gradient' && layer.gradMarkers && layer.gradMarkers[0]) ? layer.gradMarkers[0].color : layer.color;
-                                    ctx.shadowBlur = layer.blur;
-                                    ctx.shadowOffsetX = layer.ox;
-                                    ctx.shadowOffsetY = -layer.oy;
-                                } else {
-                                    ctx.translate(layer.ox, -layer.oy);
-                                }
-                                ctx.fillStyle = style;
-                                ctx.fillText(cm.char, -targetWidth / 2, 0, targetWidth);
-                                ctx.restore();
+                            if (shouldDraw) {
+                                if (mode === 'shadow') {
+                                    dctx.save();
+                                    let style = layer.mode === 'gradient' ? getAdvancedStyle(layer, cBounds, dctx) : layer.color;
+                                    // ここではネイティブのshadowBlurは使わず、オフセットのみを反映して
+                                    // バッファへ描画する。ぼかしはバッファ全体に対して後でまとめてかける。
+                                    dctx.translate(layer.ox, -layer.oy);
+                                    dctx.fillStyle = style;
+                                    dctx.fillText(cm.char, -targetWidth / 2, 0);
+                                    if ((layer.thickness || 0) > 0) {
+                                        dctx.lineJoin = 'round';
+                                        dctx.strokeStyle = style;
+                                        // ① 横方向スケール（長体/平体）で線幅が不均等にならないよう補正する
+                                        dctx.lineWidth = layer.thickness / partScaleX;
+                                        dctx.strokeText(cm.char, -targetWidth / 2, 0);
+                                    }
+                                    dctx.restore();
 
-                            } else if (mode === 'edge') {
-                                if (cm.isTarget && obj.partEdgeColor) {
-                                    ctx.strokeStyle = obj.partEdgeColor;
-                                    ctx.lineWidth = obj.partEdgeSize ?? layer.size;
-                                } else {
-                                    ctx.strokeStyle = layer.mode === 'gradient' ? getAdvancedStyle(layer, cBounds) : layer.color;
-                                    ctx.lineWidth = layer.size;
-                                }
-                                ctx.strokeText(cm.char, -targetWidth / 2, 0, targetWidth);
+                                } else if (mode === 'edge') {
+                                    let edgeSize;
+                                    if (cm.isTarget && cm.part && cm.part.edgeColor) {
+                                        dctx.strokeStyle = cm.part.edgeColor;
+                                        edgeSize = cm.part.edgeSize ?? layer.size;
+                                    } else {
+                                        dctx.strokeStyle = layer.mode === 'gradient' ? getAdvancedStyle(layer, cBounds, dctx) : layer.color;
+                                        edgeSize = layer.size;
+                                    }
+                                    // ① 縁取りが長体/平体につられて不均等な太さにならないよう、
+                                    // dctx.scale(partScaleX, 1) で生じる横方向の伸縮分を打ち消すように線幅を補正する。
+                                    dctx.lineWidth = edgeSize / partScaleX;
+                                    dctx.strokeText(cm.char, -targetWidth / 2, 0);
 
-                            } else if (mode === 'fill') {
-                                ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-                                ctx.globalCompositeOperation = 'source-over';
-                                
-                                if (overridenFill) {
-                                    ctx.fillStyle = overridenFill;
-                                } else if (obj.faceColorMode === 'solid') {
-                                    ctx.fillStyle = obj.faceSolidColor || '#ffffff';
-                                } else {
-                                    const tBounds = obj.gradMapping === 'character' ? cBounds : { left: -(ld.totalWidth*scaleX)/2, right: (ld.totalWidth*scaleX)/2, top: -fSize, bottom: 0 };
-                                    ctx.fillStyle = getAdvancedStyle(obj, tBounds);
+                                } else if (mode === 'fill') {
+                                    dctx.shadowBlur = 0; dctx.shadowOffsetX = 0; dctx.shadowOffsetY = 0;
+                                    dctx.globalCompositeOperation = 'source-over';
+                                    
+                                    if (overridenFill) {
+                                        dctx.fillStyle = overridenFill;
+                                    } else if (obj.faceColorMode === 'solid') {
+                                        dctx.fillStyle = obj.faceSolidColor || '#ffffff';
+                                    } else {
+                                        const tBounds = obj.gradMapping === 'character' ? cBounds : { left: -totalBoundsX, right: totalBoundsX, top: -fSize, bottom: 0 };
+                                        dctx.fillStyle = getAdvancedStyle(obj, tBounds, dctx);
+                                    }
+                                    dctx.fillText(cm.char, -targetWidth / 2, 0);
                                 }
-                                ctx.fillText(cm.char, -targetWidth / 2, 0, targetWidth);
                             }
-                            ctx.restore();
-                            trackingX += cm.advanceWidth * scaleX;
+                            dctx.restore();
+                            trackingX += (cm.advanceWidth + (cm.gap || 0)) * scaleX;
                         });
                         currentLineY += fSize + obj.lineSpacing;
                     });
-                }
 
-                if(obj.fxLayers) {
-                    for(let i = obj.fxLayers.length - 1; i >= 0; i--) {
-                        let layer = obj.fxLayers[i];
-                        if (layer.type === 'shadow') executeRenderPass('shadow', layer);
-                        if (layer.type === 'edge') executeRenderPass('edge', layer);
+                    // オフスクリーンに集めたシャドウ全体へ、まとめて一括ぼかしをかけて本体へ合成。
+                    if (mode === 'shadow') {
+                        ctx.save();
+                        ctx.filter = (layer && layer.blur > 0) ? `blur(${layer.blur}px)` : 'none';
+                        ctx.drawImage(shadowBuffer, 0, 0);
+                        ctx.restore();
                     }
                 }
+
+                // 1. 全体共通のスタイルスタック効果（ただし個別指定パーツの文字は除く）
+                if(obj.fxLayers) {
+                    const globalFilter = cm => !(cm.part && cm.part.fxOverride);
+                    for(let i = obj.fxLayers.length - 1; i >= 0; i--) {
+                        let layer = obj.fxLayers[i];
+                        if (layer.type === 'shadow') executeRenderPass('shadow', layer, globalFilter);
+                        if (layer.type === 'edge') executeRenderPass('edge', layer, globalFilter);
+                    }
+                }
+                // 2. パーツごとに個別指定された、独立したスタイルスタック効果
+                (obj.partLayers || []).forEach(pt => {
+                    if (pt.fxOverride && pt.fxLayers && pt.fxLayers.length) {
+                        const partFilter = cm => cm.part === pt;
+                        for (let i = pt.fxLayers.length - 1; i >= 0; i--) {
+                            let layer = pt.fxLayers[i];
+                            if (layer.type === 'shadow') executeRenderPass('shadow', layer, partFilter);
+                            if (layer.type === 'edge') executeRenderPass('edge', layer, partFilter);
+                        }
+                    }
+                });
                 executeRenderPass('fill');
 
                 if(obj.id === activeObjId && !isExport) {
@@ -1147,8 +1723,9 @@
             inplaceEditor.value = obj.text;
             inplaceEditor.style.fontSize = `${obj.size * toCSS}px`;
             inplaceEditor.style.fontFamily = obj.font;
+            inplaceEditor.style.letterSpacing = `${(obj.letterSpacing || 0) * toCSS}px`;
             inplaceEditor.style.transformOrigin = "left top";
-            inplaceEditor.style.transform = `skewX(${obj.skewX}deg)`;
+            inplaceEditor.style.transform = `scaleX(${obj.scaleX / 100}) skewX(${obj.skewX}deg)`;
             inplaceEditor.style.textAlign = obj.align === 'center' ? 'center' : (obj.align === 'right' ? 'right' : 'left');
 
             inplaceEditor.focus();
@@ -1157,7 +1734,12 @@
                 obj.text = inplaceEditor.value;
                 document.getElementById('textStr').value = inplaceEditor.value;
                 drawSystem();
+                updateKerningReadout();
             };
+
+            currentSelRange = { start: -1, end: -1 };
+            updateSelRangeLabel();
+            updateKerningReadout();
         }
 
         function syncSelectionToRange() {
@@ -1166,12 +1748,10 @@
             const start = inplaceEditor.selectionStart;
             const end = inplaceEditor.selectionEnd;
             if (start !== end) {
-                obj.partStart = start;
-                obj.partEnd = end - 1;
-                document.getElementById('rangeStart').value = start;
-                document.getElementById('rangeEnd').value = end - 1;
+                currentSelRange = { start: start, end: end - 1 };
+                updateSelRangeLabel();
             }
-            drawSystem();
+            updateKerningReadout();
         }
 
         inplaceEditor.addEventListener('select', syncSelectionToRange);
@@ -1180,8 +1760,55 @@
 
         function closeInplaceEditor() { inplaceEditor.style.display = 'none'; drawSystem(); }
 
+        // ④ カーニング: プレビュー（インプレースエディタ）上で文字と文字の間にカーソルを置いた状態で
+        // Alt＋←／→ を押すと、その1箇所（gap）だけの手動カーニングを詰める／広げる。
+        // Option キーも DOM 上は altKey として渡ってくるため、Mac でも同じ判定でそのまま動く。
+        const KERNING_STEP = 2;
+        function getKerningGapIndexAtCursor() {
+            if (inplaceEditor.style.display !== 'block') return null;
+            const pos = inplaceEditor.selectionStart;
+            if (pos == null || pos !== inplaceEditor.selectionEnd) return null; // 範囲選択中は対象外（1点のカーソルのみ）
+            const text = inplaceEditor.value;
+            if (pos <= 0 || pos >= text.length) return null; // 前後どちらかに文字が無い位置は対象外
+            if (text[pos - 1] === '\n' || text[pos] === '\n') return null; // 改行をまたぐ位置は対象外
+            return pos - 1; // drawSystem 側の絶対インデックス（＝直前の文字のインデックス）と対応させる
+        }
+
+        function updateKerningReadout() {
+            const label = document.getElementById('kerningInfoLabel');
+            if (!label) return;
+            const obj = getActiveObj();
+            const gapIdx = getKerningGapIndexAtCursor();
+            if (!obj || gapIdx === null) { label.innerText = '未選択'; return; }
+            const val = (obj.manualKerning && obj.manualKerning[gapIdx] != null) ? obj.manualKerning[gapIdx] : 0;
+            label.innerText = `${val > 0 ? '+' : ''}${val}px`;
+        }
+
+        function adjustKerningAtCursor(delta) {
+            const obj = getActiveObj(); if (!obj || obj.type !== 'text') return;
+            const gapIdx = getKerningGapIndexAtCursor();
+            if (gapIdx === null) return;
+            if (!obj.manualKerning) obj.manualKerning = {};
+            obj.manualKerning[gapIdx] = (obj.manualKerning[gapIdx] || 0) + delta;
+            drawSystem();
+            updateKerningReadout();
+        }
+
+        function resetManualKerningAtCursor() {
+            const obj = getActiveObj(); if (!obj || !obj.manualKerning) return;
+            const gapIdx = getKerningGapIndexAtCursor();
+            if (gapIdx === null) return;
+            delete obj.manualKerning[gapIdx];
+            drawSystem();
+            updateKerningReadout();
+        }
+
         inplaceEditor.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) { e.preventDefault(); closeInplaceEditor(); }
+            if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) { e.preventDefault(); closeInplaceEditor(); return; }
+            if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                e.preventDefault();
+                adjustKerningAtCursor(e.key === 'ArrowLeft' ? -KERNING_STEP : KERNING_STEP);
+            }
         });
 
         window.addEventListener('mousemove', (e) => {
@@ -1193,8 +1820,8 @@
                 if (Math.abs(ty - 1080/2) < thresh) ty = 1080/2;
             }
             dragTargetObj.x = Math.round(tx); dragTargetObj.y = Math.round(ty);
-            if(document.getElementById('objX')) document.getElementById('objX').value = dragTargetObj.x;
-            if(document.getElementById('objY')) document.getElementById('objY').value = dragTargetObj.y;
+            if(document.getElementById('objX')) { document.getElementById('objX').value = dragTargetObj.x; document.getElementById('objX_num').value = dragTargetObj.x; }
+            if(document.getElementById('objY')) { document.getElementById('objY').value = dragTargetObj.y; document.getElementById('objY_num').value = dragTargetObj.y; }
             drawSystem();
         });
         window.addEventListener('mouseup', () => { isDragging = false; dragTargetObj = null; });
@@ -1242,6 +1869,27 @@
                     }
 
                     objects = cfg.objects;
+                    // 旧バージョン(単一範囲指定)の設定ファイルを新しい複数パーツ形式へ移行
+                    objects.forEach(o => {
+                        if (o.type !== 'text') return;
+                        if (!o.partLayers) {
+                            o.partLayers = [];
+                            if (o.partStart != null && o.partEnd != null && o.partStart !== -1 && o.partEnd !== -1) {
+                                o.partLayers.push({
+                                    id: 'part_' + Date.now() + '_' + Math.floor(Math.random()*1000),
+                                    start: o.partStart, end: o.partEnd,
+                                    faceMode: o.partMode || 'none', color: o.partColor || '#ffea00',
+                                    gradMarkers: o.partGradMarkers || [{pos:0,color:'#ffffff'},{pos:100,color:'#ff00aa'}],
+                                    gradAngle: o.partGradAngle ?? 90,
+                                    font: o.partFont || null, size: o.partSize || null,
+                                    edgeColor: o.partEdgeColor || null, edgeSize: o.partEdgeSize || null,
+                                    kerning: o.partKerning != null ? o.partKerning : null,
+                                    scaleX: null, skewX: null, offsetX: 0, offsetY: 0, rotate: 0,
+                                    fxOverride: false, fxLayers: []
+                                });
+                            }
+                        }
+                    });
                     activeObjId = cfg.activeObjId || (objects.length > 0 ? objects[0].id : null);
                     
                     selectObjectBind();
